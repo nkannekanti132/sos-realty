@@ -10,11 +10,12 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&amp;family=Manrope:wght@400;500;600;700&amp;family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap" rel="stylesheet"/>
-<link href="styles.css?v=14" rel="stylesheet"/>
-<link href="omnipress.css?v=14" rel="stylesheet"/>
-<link href="janardhan-brand.css?v=14" rel="stylesheet"/>
-<link href="professional.css?v=14" rel="stylesheet"/>
-<link href="experience.css?v=14" rel="stylesheet"/></head>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<link href="styles.css?v=15" rel="stylesheet"/>
+<link href="omnipress.css?v=15" rel="stylesheet"/>
+<link href="janardhan-brand.css?v=15" rel="stylesheet"/>
+<link href="professional.css?v=15" rel="stylesheet"/>
+<link href="experience.css?v=19" rel="stylesheet"/></head>
 <body>
 <div aria-hidden="true" class="scroll-progress" id="progress"></div>
 <header class="site-header" id="siteHeader">
@@ -112,8 +113,9 @@
 <details class="photo-credits"><summary>Photo credits</summary><ul><li>Hero: night aerial view of Las Vegas. Photo by Carol M. Highsmith, Library of Congress, via <a href="https://commons.wikimedia.org/wiki/File:Night_aerial_view,_Las_Vegas,_Nevada,_04649u.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, public domain. Resized.</li><li>Las Vegas: the Strip at night. Photo by MattLanzaWiki, <a href="https://commons.wikimedia.org/wiki/File:View_of_the_Las_Vegas_Strip.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0" target="_blank" rel="noopener">CC BY-SA 4.0</a>. Resized.</li><li>Henderson: Lake Las Vegas. Photo by Renee Grayson, <a href="https://commons.wikimedia.org/wiki/File:Lake_Las_Vegas_View.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by/2.0" target="_blank" rel="noopener">CC BY 2.0</a>. Resized.</li><li>North Las Vegas: Aliante Nature Discovery Park. Photo by Kim Dung Ho, <a href="https://commons.wikimedia.org/wiki/File:Aliante_Nature_Discovery_Park_(2015).jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by/2.0" target="_blank" rel="noopener">CC BY 2.0</a>. Resized.</li><li>Boulder City: Lake Mead near Hoover Dam. Photo by Christian David, <a href="https://commons.wikimedia.org/wiki/File:U.S._Route_93_descending_towards_Lake_Mead_near_Hoover_Dam,_Nevada.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0" target="_blank" rel="noopener">CC BY-SA 4.0</a>. Resized.</li><li>Inner-page banners: Lake Las Vegas aerial view. Photo by Carol M. Highsmith, Library of Congress, via <a href="https://commons.wikimedia.org/wiki/File:Lake_Las_Vegas_aerial_view.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>, public domain. Resized.</li></ul></details>
 <dialog aria-labelledby="modalTitle" class="app-modal" id="appModal"><button aria-label="Close dialog" class="modal-close" id="modalClose">×</button><div id="modalBody"></div></dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
-<script src="mock-backend.js?v=14"></script><script src="app.js?v=14"></script>
-<script src="omnipress.js?v=14"></script>
-<script src="experience.js?v=14"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="mock-backend.js?v=15"></script><script src="app.js?v=15"></script>
+<script src="omnipress.js?v=16"></script>
+<script src="experience.js?v=15"></script>
 <script>document.addEventListener('DOMContentLoaded',()=>{document.getElementById('heroSmart')?.addEventListener('submit',e=>{e.preventDefault();const q=document.getElementById('heroQuery').value.trim();window.RealEstateStudio?.open('search',q?{q}:{});});document.getElementById('professionalHeroSearch')?.addEventListener('submit',e=>{e.preventDefault();window.RealEstateStudio?.open('search',{city:document.getElementById('heroCity').value,maxPrice:document.getElementById('heroBudget').value});});});</script></body>
 </html>

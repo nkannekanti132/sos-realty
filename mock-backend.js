@@ -34,18 +34,22 @@
     {type:'House',status:'Active',tour:true,days:30,garage:3,stories:2,hoa:0,views:['Lake','Mountain'],sub:'Boulder Creek Golf',features:['Private Pool','Pool','Garage','Golf Course','Has RV Parking']},
     {type:'House',status:'Active',tour:false,days:8,garage:1,stories:1,hoa:0,views:['Mountain'],sub:'Historic District',features:['One Story','No Pool','Distressed','Fireplace']}
   ];
-  const listings = samples.map((a,i)=>{const d=details[i];return {
+  // Illustrative assumable-loan terms and approximate neighborhood locations (not real addresses or loans).
+  const loans = {0:['VA',2.75,598000],1:['VA',2.875,712000],3:['FHA',3.125,472000],4:['VA',3.25,905000],6:['FHA',2.5,402000],7:['FHA',2.99,455000],9:['VA',2.625,512000],11:['VA',2.25,468000]};
+  const spots = [[36.1655,-115.3352],[36.1421,-115.3068],[36.2793,-115.2705],[36.0213,-115.0846],[35.9952,-115.0108],[35.9655,-115.0902],[36.2951,-115.1652],[36.3052,-115.2051],[36.2897,-115.1248],[35.9771,-114.8352],[35.9583,-114.8601],[35.9732,-114.8421]];
+  const listings = samples.map((a,i)=>{const d=details[i],ln=loans[i];return {
+    assumable:Boolean(ln),loanType:ln?ln[0]:null,assumableRate:ln?ln[1]:null,loanBalance:ln?ln[2]:null,yearsLeft:ln?26-(i%4):null,latlng:spots[i],
     id:i+1,name:a[0],city:a[1],address:a[1]+', NV · illustrative location',price:a[2],beds:a[3],baths:a[4],sqft:a[5],
-    category:a[6],image:a[7],tag:a[8],featured:a[9],newListing:a[10],openHouse:a[11],assumable:a[12],
+    category:a[6],image:a[7],tag:a[8],featured:a[9],newListing:a[10],openHouse:a[11],
     description:`A fictional concept residence designed to illustrate the ${a[1]} property-search experience. Images, prices, features, and events are placeholders—not real properties or offers.`,
     type:d.type,status:d.status,virtualTour:d.tour,daysOnSite:d.days,garage:d.garage,stories:d.stories,hoa:d.hoa,views:d.views,subdivision:d.sub,features:d.features,
     school:'Clark County School District',year:2006+(i*3)%19,lot:+(0.12+(i%5)*0.07).toFixed(2),reference:'SAMPLE-'+String(24001+i),coords:[23+(i*11)%65,25+(i*13)%56]
   };});
   const soldBase={type:'House',virtualTour:false,garage:2,stories:1,hoa:0,views:[],features:['Garage'],school:'Clark County School District',year:2012,lot:0.18,featured:false,newListing:false,openHouse:null,assumable:false,category:['family']};
   const soldListings = [
-    {...soldBase,id:101,name:'The Valley View',city:'Las Vegas',address:'Las Vegas, NV · example only',price:659000,beds:4,baths:3,sqft:2600,image:'assets/home-02.jpg',status:'Sold',soldDate:'2026-10-18',daysOnSite:40,subdivision:'Summerlin',reference:'SAMPLE-23101',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[30,44]},
-    {...soldBase,id:102,name:'The Parkside House',city:'Henderson',address:'Henderson, NV · example only',price:865000,beds:4,baths:3,sqft:2800,image:'assets/home-04.jpg',status:'Sold',soldDate:'2026-09-27',daysOnSite:61,subdivision:'Inspirada',reference:'SAMPLE-23102',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[62,66]},
-    {...soldBase,id:103,name:'The Canyon Residence',city:'Boulder City',address:'Boulder City, NV · example only',price:739000,beds:3,baths:2,sqft:2300,image:'assets/home-06.jpg',status:'Sold',soldDate:'2026-08-30',daysOnSite:89,subdivision:'Boulder Hills',reference:'SAMPLE-23103',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[80,78]}
+    {...soldBase,id:101,name:'The Valley View',city:'Las Vegas',address:'Las Vegas, NV · example only',price:659000,beds:4,baths:3,sqft:2600,image:'assets/home-02.jpg',status:'Sold',soldDate:'2026-10-18',daysOnSite:40,subdivision:'Summerlin',reference:'SAMPLE-23101',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[30,44],latlng:[36.1836,-115.3093]},
+    {...soldBase,id:102,name:'The Parkside House',city:'Henderson',address:'Henderson, NV · example only',price:865000,beds:4,baths:3,sqft:2800,image:'assets/home-04.jpg',status:'Sold',soldDate:'2026-09-27',daysOnSite:61,subdivision:'Inspirada',reference:'SAMPLE-23102',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[62,66],latlng:[35.9562,-115.1205]},
+    {...soldBase,id:103,name:'The Canyon Residence',city:'Boulder City',address:'Boulder City, NV · example only',price:739000,beds:3,baths:2,sqft:2300,image:'assets/home-06.jpg',status:'Sold',soldDate:'2026-08-30',daysOnSite:89,subdivision:'Boulder Hills',reference:'SAMPLE-23103',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[80,78],latlng:[35.9688,-114.8512]}
   ];
   const guides = {
     'Las Vegas':{
