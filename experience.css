@@ -544,3 +544,4 @@ body .site-header .header-contact:hover{background:#e7d3a1!important;transform:t
 @media(prefers-reduced-motion:reduce){.photo-hero-img,.photo-hero-copy{animation:none!important}.studio-shell>.sr{opacity:1;transform:none}}
 body.studio-open .site-header:not(.studio-scrolled){height:var(--hdr)!important;min-height:var(--hdr)!important}
 body.studio-open .site-header:not(.studio-scrolled) .brand-logo img{height:62px}
+body .site-header .main-nav .nav-dropdown.nav-hush .nav-pop{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
