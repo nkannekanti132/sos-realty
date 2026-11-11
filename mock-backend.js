@@ -1,57 +1,20 @@
 /**
  * SOS Realty Group / Janardhan Vangala — LOCAL-ONLY FRONTEND DEMO.
- * Fictional properties, invented prices, and example events are explicitly sample content,
- * not actual inventory, agent sales records, available assumable loans, or MLS data.
- * No backend, authentication, CRM or email provider is connected.
+ * Listing facts come from the mock Trestle feed in data-source.js.
+ * Assumable facts come only from the Assumable Data table in that same file.
+ * Swap those two ports when the live key and Cloudflare database are connected.
+ * No live MLS, authentication provider, or email provider is connected.
  */
 (function () {
   'use strict';
-  const samples = [
-    ['The Desert Horizon','Las Vegas',775000,4,3,2670,['family','modern'],'assets/home-01.jpg','WARM DESERT MODERN',true,true,'Saturday · Demo 11 AM–1 PM',false],
-    ['The Silver Palm','Las Vegas',995000,4,4,3240,['luxury','modern'],'assets/home-03.jpg','DESIGN-LED LIVING',true,false,null,true],
-    ['The Sunrise Courtyard','Las Vegas',545000,3,2,1890,['family'],'assets/home-04.jpg','LIVABLE LUXURY',false,true,null,false],
-    ['The Green Valley Residence','Henderson',859000,4,3,2850,['family','modern'],'assets/home-02.jpg','OPEN SPACES',true,true,'Sunday · Demo 1–3 PM',false],
-    ['The Mountain View House','Henderson',1395000,5,4,4250,['luxury','family'],'assets/home-05.jpg','MOUNTAIN BACKDROP',true,false,null,true],
-    ['The Quiet Retreat','Henderson',645000,3,2,2040,['family'],'assets/home-06.jpg','EVERYDAY COMFORT',false,true,null,false],
-    ['The North Star','North Las Vegas',499000,3,2,1820,['family'],'assets/home-04.jpg','A PLACE TO GROW',false,true,'Saturday · Demo 12–2 PM',true],
-    ['The Mesa Collection','North Las Vegas',635000,4,3,2460,['modern','family'],'assets/home-01.jpg','MODERN FAMILY HOME',true,false,null,false],
-    ['The Cielo House','North Las Vegas',725000,4,3,2820,['modern'],'assets/home-03.jpg','DESERT LIGHT',false,true,null,false],
-    ['The Boulder Vista','Boulder City',685000,3,2,2230,['family'],'assets/home-06.jpg','HISTORIC CHARM',false,true,'Sunday · Demo 12–2 PM',true],
-    ['The Lake Mead Retreat','Boulder City',1125000,4,3,3170,['luxury','modern'],'assets/home-05.jpg','LAKESIDE INSPIRATION',true,false,null,false],
-    ['The Heritage House','Boulder City',589000,3,2,1920,['family'],'assets/home-02.jpg','SMALL-TOWN SOUL',false,true,null,false]
-  ];
-  const details = [
-    {type:'House',status:'Active',tour:true,days:2,garage:3,stories:2,hoa:95,views:['Mountain'],sub:'Summerlin West',features:['Private Pool','Pool','Garage','Fireplace','Gated Community']},
-    {type:'House',status:'Active',tour:true,days:9,garage:3,stories:2,hoa:180,views:['Strip','Mountain'],sub:'The Ridges',features:['Private Pool','Pool','Garage','Gated Community','Golf Course','Primary Bedroom Downstairs']},
-    {type:'Townhome',status:'Active',tour:false,days:1,garage:2,stories:2,hoa:140,views:[],sub:'Centennial Hills',features:['Garage','No Pool','Price Decrease']},
-    {type:'House',status:'Active',tour:false,days:4,garage:2,stories:1,hoa:60,views:['Mountain'],sub:'Green Valley Ranch',features:['Garage','One Story','Pool','Primary Bedroom Downstairs','Fireplace']},
-    {type:'House',status:'Active',tour:true,days:21,garage:4,stories:2,hoa:250,views:['Strip','Mountain','City'],sub:'MacDonald Highlands',features:['Private Pool','Pool','Garage','Gated Community','Golf Course','Has Elevator','Has RV Parking']},
-    {type:'Condo',status:'Pending',tour:false,days:3,garage:1,stories:1,hoa:310,views:['Mountain'],sub:'Anthem',features:['Age Restricted','One Story','Accessibility','No Pool']},
-    {type:'House',status:'Active',tour:false,days:6,garage:2,stories:1,hoa:45,views:[],sub:'Aliante',features:['Garage','One Story','Has RV Parking','New Construction']},
-    {type:'House',status:'Active',tour:true,days:14,garage:3,stories:2,hoa:70,views:['Mountain'],sub:'Valley Vista',features:['Garage','Pool','Private Pool','Price Decrease']},
-    {type:'Townhome',status:'Pending',tour:false,days:2,garage:2,stories:2,hoa:120,views:['City'],sub:'Eldorado',features:['Garage','New Construction','Active Under Contract']},
-    {type:'House',status:'Active',tour:false,days:5,garage:2,stories:1,hoa:0,views:['Lake','Mountain'],sub:'Old Town Boulder City',features:['Garage','One Story','Fireplace','Basement','Horse Property']},
-    {type:'House',status:'Active',tour:true,days:30,garage:3,stories:2,hoa:0,views:['Lake','Mountain'],sub:'Boulder Creek Golf',features:['Private Pool','Pool','Garage','Golf Course','Has RV Parking']},
-    {type:'House',status:'Active',tour:false,days:8,garage:1,stories:1,hoa:0,views:['Mountain'],sub:'Historic District',features:['One Story','No Pool','Distressed','Fireplace']}
-  ];
-  // Illustrative assumable-loan terms and approximate neighborhood locations (not real addresses or loans).
-  const loans = {0:['VA',2.75,598000],1:['VA',2.875,712000],3:['FHA',3.125,472000],4:['VA',3.25,905000],6:['FHA',2.5,402000],7:['FHA',2.99,455000],9:['VA',2.625,512000],11:['VA',2.25,468000]};
-  const seedTags = {0:['Loan verified','Servicer confirmed','Photos verified'],3:['Loan verified','Rate verified'],6:['Loan verified','Servicer confirmed','Rate verified','Balance verified'],11:['Loan verified']};
-  const spots = [[36.1655,-115.3352],[36.1421,-115.3068],[36.2793,-115.2705],[36.0213,-115.0846],[35.9952,-115.0108],[35.9655,-115.0902],[36.2951,-115.1652],[36.3052,-115.2051],[36.2897,-115.1248],[35.9771,-114.8352],[35.9583,-114.8601],[35.9732,-114.8421]];
-  const listings = samples.map((a,i)=>{const d=details[i],ln=loans[i];return {
-    assumable:Boolean(ln),verified:[...(seedTags[i]||[])],loanType:ln?ln[0]:null,assumableRate:ln?ln[1]:null,loanBalance:ln?ln[2]:null,yearsLeft:ln?26-(i%4):null,latlng:spots[i],
-    id:i+1,name:a[0],city:a[1],address:a[1]+', NV · illustrative location',price:a[2],beds:a[3],baths:a[4],sqft:a[5],
-    category:a[6],image:a[7],tag:a[8],featured:a[9],newListing:a[10],openHouse:a[11],
-    description:`A fictional concept residence designed to illustrate the ${a[1]} property-search experience. Images, prices, features, and events are placeholders—not real properties or offers.`,
-    type:d.type,status:d.status,virtualTour:d.tour,daysOnSite:d.days,garage:d.garage,stories:d.stories,hoa:d.hoa,views:d.views,subdivision:d.sub,features:d.features,
-    school:'Clark County School District',year:2006+(i*3)%19,lot:+(0.12+(i%5)*0.07).toFixed(2),reference:'SAMPLE-'+String(24001+i),coords:[23+(i*11)%65,25+(i*13)%56]
-  };});
-  const soldBase={type:'House',virtualTour:false,garage:2,stories:1,hoa:0,views:[],features:['Garage'],school:'Clark County School District',year:2012,lot:0.18,featured:false,newListing:false,openHouse:null,assumable:false,category:['family']};
-  const soldListings = [
-    {...soldBase,id:101,name:'The Valley View',city:'Las Vegas',address:'Las Vegas, NV · example only',price:659000,beds:4,baths:3,sqft:2600,image:'assets/home-02.jpg',status:'Sold',soldDate:'2026-10-18',daysOnSite:40,subdivision:'Summerlin',reference:'SAMPLE-23101',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[30,44],latlng:[36.1836,-115.3093]},
-    {...soldBase,id:102,name:'The Parkside House',city:'Henderson',address:'Henderson, NV · example only',price:865000,beds:4,baths:3,sqft:2800,image:'assets/home-04.jpg',status:'Sold',soldDate:'2026-09-27',daysOnSite:61,subdivision:'Inspirada',reference:'SAMPLE-23102',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[62,66],latlng:[35.9562,-115.1205]},
-    {...soldBase,id:103,name:'The Canyon Residence',city:'Boulder City',address:'Boulder City, NV · example only',price:739000,beds:3,baths:2,sqft:2300,image:'assets/home-06.jpg',status:'Sold',soldDate:'2026-08-30',daysOnSite:89,subdivision:'Boulder Hills',reference:'SAMPLE-23103',tag:'SAMPLE PAST SALE',description:'Illustrative sale — not a transaction record.',coords:[80,78],latlng:[35.9688,-114.8512]}
-  ];
+  const listings = [];
+  const soldListings = [];
+  function rebuild(){
+    const all = (window.DataPorts && DataPorts.catalog) ? DataPorts.catalog() : [];
+    listings.splice(0, listings.length, ...all.filter(h => h.status !== 'Sold'));
+    soldListings.splice(0, soldListings.length, ...all.filter(h => h.status === 'Sold'));
+  }
+  rebuild();
   const guides = {
     'Las Vegas':{
       subtitle:'From the downtown Arts District to quiet west-side streets near Red Rock Canyon.',
@@ -148,16 +111,17 @@
     {id:'L-1006',name:'Luis Ortega',email:'l.ortega@example.com',phone:'(702) 555-0193',intent:'tour',source:'map',home:'The Mesa Collection',message:'FHA assumption — what credit score is needed?',submittedAt:'2026-10-30T15:58:00Z',sample:true}
   ];
   const LEAD_STATUSES=['New','Contacted','Touring','Under contract','Closed','Lost'];
-  const VERIFY_TAGS=['Loan verified','Servicer confirmed','Rate verified','Balance verified','Assumption approved','Seller confirmed','Photos verified','Inspection done'];
-  const baseline={};listings.forEach(h=>{baseline[h.id]={assumable:h.assumable,loanType:h.loanType,assumableRate:h.assumableRate,loanBalance:h.loanBalance,yearsLeft:h.yearsLeft,status:h.status,verified:[...h.verified],adminNote:''};});
-  const applyOverrides=()=>{const ov=get(KEY+'listing_overrides')[0]||{};listings.forEach(h=>Object.assign(h,JSON.parse(JSON.stringify(baseline[h.id])),ov[h.id]||{}));};
-  applyOverrides();
+  const homeById=id=>listings.find(h=>h.id===Number(id));
   const users=()=>{const stored=get(KEY+'users');return stored.length?stored:DEMO_USERS.map(u=>({...u}));};
   const publicUser=u=>u?(({password,...rest})=>rest)(u):null;
   const seeded=seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
   const dayKey=d=>d.toISOString().slice(0,10);
   Object.assign(window.MockAPI,{
-    VERIFY_TAGS,LEAD_STATUSES,DEMO_USERS:DEMO_USERS.filter(u=>u.password).map(u=>({email:u.email,password:u.password,role:u.role,name:u.name})),
+    LEAD_STATUSES,DEMO_USERS:DEMO_USERS.filter(u=>u.password).map(u=>({email:u.email,password:u.password,role:u.role,name:u.name})),
+    customFields(){return DataPorts.db.fields.list();},
+    customCategories(){return DataPorts.db.categories.list();},
+    createCategory(input){const res=DataPorts.db.categories.create(input);rebuild();return res;},
+    createField(input){const res=DataPorts.db.fields.create(input);rebuild();return res;},
     currentUser(){const s=get(KEY+'session')[0];if(!s)return null;return publicUser(users().find(u=>u.id===s.userId));},
     signIn(email,password){const u=users().find(x=>x.email.toLowerCase()===String(email).trim().toLowerCase());
       if(!u)return{ok:false,error:'No account uses that email. Create one, or use a demo account below.'};
@@ -172,9 +136,28 @@
     getUsers(){return users().map(publicUser);},
     updateUser(id,patch){const all=users();const u=all.find(x=>x.id===Number(id));if(u)Object.assign(u,patch);set(KEY+'users',all);},
     deleteUser(id){set(KEY+'users',users().filter(u=>u.id!==Number(id)));},
-    updateListing(id,patch){const ov=get(KEY+'listing_overrides')[0]||{};ov[id]={...(ov[id]||{}),...patch};set(KEY+'listing_overrides',[ov]);applyOverrides();},
-    resetListing(id){const ov=get(KEY+'listing_overrides')[0]||{};delete ov[id];set(KEY+'listing_overrides',[ov]);applyOverrides();},
-    isEdited(id){return Boolean((get(KEY+'listing_overrides')[0]||{})[id]);},
+    updateListing(id,patch){
+      const h=homeById(id);if(!h)return;
+      const key=h.listingKey,db=DataPorts.db;
+      if(patch.assumable===false)db.assumable.remove(key);
+      else {
+        const row={};
+        if(patch.assumableRate!=null&&patch.assumableRate!=='')row.interest_rate=patch.assumableRate;
+        if(patch.loanBalance!=null&&patch.loanBalance!=='')row.remaining_balance=patch.loanBalance;
+        if(patch.downPayment!=null&&patch.downPayment!=='')row.down_payment_required=patch.downPayment;
+        if(patch.rentalRestrictions)row.rental_restrictions=patch.rentalRestrictions;
+        if(patch.loanTermMonths!=null&&patch.loanTermMonths!=='')row.balance_loan_term=patch.loanTermMonths;
+        if(patch.assumable===true||Object.keys(row).length)db.assumable.save(key,row);
+      }
+      if(patch.loanType!=null){const f=db.fields.list().find(x=>x.name==='Loan program');if(f)db.values.set(key,f.id,patch.loanType);}
+      if(Array.isArray(patch.verified)){
+        db.fields.list().filter(f=>f.category_id==='cat-verification').forEach(f=>db.values.set(key,f.id,patch.verified.includes(f.name)?'Yes':''));
+      }
+      if(patch.customValues)Object.entries(patch.customValues).forEach(([fieldId,value])=>db.values.set(key,fieldId,value));
+      rebuild();
+    },
+    resetListing(id){const h=homeById(id);if(h)DataPorts.db.assumable.reset(h.listingKey);rebuild();},
+    isEdited(id){const h=homeById(id);return h?DataPorts.db.assumable.isEdited(h.listingKey):false;},
     getLeads(){const st=get(KEY+'lead_status')[0]||{};return [...this.getInquiries().map(x=>({...x,id:String(x.id),home:x.property||x.home||'—'})),...SAMPLE_LEADS].map(l=>({...l,status:st[l.id]||'New'})).sort((a,b)=>String(b.submittedAt).localeCompare(String(a.submittedAt)));},
     setLeadStatus(id,status){const st=get(KEY+'lead_status')[0]||{};st[id]=status;set(KEY+'lead_status',[st]);},
     track(type,data={}){const ev=get(KEY+'events');ev.push({type,...data,at:new Date().toISOString()});set(KEY+'events',ev.slice(-3000));},
@@ -186,7 +169,7 @@
         const visitors=Math.round((118+rnd()*46)*wk*trend),r=realBy[dayKey(d)]||{views:0,searches:0,saves:0},k=[rnd(),rnd(),rnd(),rnd()];
         if(i<days*2)out.push({date:dayKey(d),visitors:visitors+(r.views?1:0),views:Math.round(visitors*(2.4+k[0]*.7))+r.views,searches:Math.round(visitors*(.55+k[1]*.2))+r.searches,saves:Math.round(visitors*(.06+k[2]*.04))+r.saves,leads:Math.round(visitors*(.012+k[3]*.012))+(leadsBy[dayKey(d)]||0)});}
       return out;},
-    exportAll(){return {listings:listings.map(h=>({...h})),users:this.getUsers(),leads:this.getLeads(),savedSearches:this.getSavedSearches(),alerts:this.getAlerts(),favorites:this.getFavorites(),events:this.getEvents()};},
-    resetDemoData(){try{Object.keys(localStorage).filter(k=>k.startsWith(KEY)).forEach(k=>localStorage.removeItem(k));}catch{}Object.keys(cache).forEach(k=>delete cache[k]);applyOverrides();}
+    exportAll(){const tables=DataPorts.db.tables();return {trestle_properties:DataPorts.catalog().map(h=>({listingKey:h.listingKey,reference:h.reference,name:h.name,city:h.city,price:h.price,beds:h.beds,baths:h.baths,sqft:h.sqft,status:h.status,address:h.address})),assumable_data:tables.assumable_data,custom_categories:tables.custom_categories,custom_fields:tables.custom_fields,custom_values:tables.custom_values,listings:[...listings,...soldListings].map(h=>({id:h.id,listingKey:h.listingKey,name:h.name,city:h.city,price:h.price,status:h.status,assumable:h.assumable,assumableRate:h.assumableRate,loanBalance:h.loanBalance,downPayment:h.downPayment,rentalRestrictions:h.rentalRestrictions,loanTermMonths:h.loanTermMonths,loanType:h.loanType})),users:this.getUsers(),leads:this.getLeads(),savedSearches:this.getSavedSearches(),alerts:this.getAlerts(),favorites:this.getFavorites(),events:this.getEvents()};},
+    resetDemoData(){try{Object.keys(localStorage).filter(k=>k.startsWith(KEY)).forEach(k=>localStorage.removeItem(k));}catch{}Object.keys(cache).forEach(k=>delete cache[k]);DataPorts.db.reset();rebuild();}
   });
 })();
