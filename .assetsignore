@@ -4,5 +4,6 @@ wrangler.jsonc
 .git
 .gitignore
 .assetsignore
+.wrangler
 README.md
 **/.DS_Store
