@@ -91,7 +91,7 @@
     {email:'buyer@sosrealty.demo',password:'Buyer@2026',role:'user',name:'Alex Morgan'}
   ];
   const LEAD_STATUSES=['New','Contacted','Touring','Under contract','Closed','Lost'];
-  const homeById=id=>listings.find(h=>h.id===Number(id));
+  const homeById=id=>listings.find(h=>h.id===Number(id))||soldListings.find(h=>h.id===Number(id));
   const users=()=>remote.users||[];
   const publicUser=u=>u?(({password,...rest})=>rest)(u):null;
   const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,session:null};
