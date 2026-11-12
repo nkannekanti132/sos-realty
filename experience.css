@@ -876,7 +876,11 @@ em.up{color:#1f7a52}em.down{color:#c03636}
 .adm-tags span{padding:4px 8px;border-radius:999px;background:#f0ece2;font-size:11.5px;font-weight:600;white-space:nowrap}
 .adm-tags span.key{background:#e5f3ec;color:#1f7a52}.adm-tags span.none{background:none;color:#c03636;padding:0}
 .adm-msg{max-width:280px;color:#4b5563}
-.adm-edit{display:grid;grid-template-columns:1.3fr 1fr;gap:18px 24px;padding:8px 4px}
+.adm-edit{display:grid;grid-template-columns:1fr;gap:18px;padding:8px 4px}
+.adm-assume-body[hidden]{display:none}
+.adm-add-field{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:14px}
+.adm-add-field label{display:grid;gap:6px;flex:1;min-width:140px;font:600 12px 'DM Sans',sans-serif;color:#5b6475}
+.adm-add-field .studio-btn{height:52px}
 .adm-edit fieldset{margin:0;padding:0;border:0;min-width:0}
 .adm-edit legend{font:700 12px 'DM Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#7a8394;margin-bottom:10px}
 .adm-edit fieldset:nth-of-type(3),.adm-edit-actions{grid-column:1/-1}
