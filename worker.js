@@ -181,6 +181,27 @@ async function mutate(env, request, body) {
   const admin = user && user.role === 'admin';
   const { action, payload = {} } = body || {};
   const own = owner(user, client);
+  if (action === 'listing.save') {
+    if (!admin) return json({ ok: false, error: 'Admins only.' }, 403);
+    const key = payload.listingKey;
+    if (!key) return json({ ok: false, error: 'That listing has no id.' }, 400);
+    if (payload.removed) {
+      await env.DB.prepare('DELETE FROM assumable_data WHERE listing_key = ?').bind(key).run();
+    } else if (payload.row) {
+      const row = payload.row;
+      const rate = row.interest_rate == null || row.interest_rate === '' ? null : Number(Number(row.interest_rate).toFixed(3));
+      const amount = v => v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v);
+      const rental = ['Yes', 'No', 'Not known'].includes(row.rental_restrictions) ? row.rental_restrictions : 'Not known';
+      await env.DB.prepare('INSERT INTO assumable_data (unique_id, listing_key, interest_rate, remaining_balance, down_payment_required, rental_restrictions, balance_loan_term) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(listing_key) DO UPDATE SET interest_rate = excluded.interest_rate, remaining_balance = excluded.remaining_balance, down_payment_required = excluded.down_payment_required, rental_restrictions = excluded.rental_restrictions, balance_loan_term = excluded.balance_loan_term').bind(row.unique_id || ('AD-' + key), key, rate, amount(row.remaining_balance), amount(row.down_payment_required), rental, amount(row.balance_loan_term)).run();
+    }
+    if (Array.isArray(payload.values)) {
+      await env.DB.prepare('DELETE FROM custom_values WHERE listing_key = ?').bind(key).run();
+      for (const value of payload.values) {
+        if (value && value.field_id && String(value.value || '').trim()) await env.DB.prepare('INSERT INTO custom_values (listing_key, field_id, value) VALUES (?, ?, ?)').bind(key, value.field_id, String(value.value).trim()).run();
+      }
+    }
+    return json({ ok: true });
+  }
   if (action === 'assumable.save') {
     if (!admin) return json({ ok: false, error: 'Admins only.' }, 403);
     const key = payload.listingKey;

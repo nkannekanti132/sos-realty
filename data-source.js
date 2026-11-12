@@ -168,7 +168,9 @@
 
   let memory = null;
   let remote = false;
+  let holding = false;
   const emptyDb = () => ({ assumable_data: [], custom_categories: [], custom_fields: [], custom_values: [] });
+  const offline = { ok:false, error:'The database is not connected.' };
   function readDb(){
     return remote && memory ? memory : emptyDb();
   }
@@ -176,8 +178,15 @@
     if (remote) memory = db;
   }
   function touch(action, payload){
-    if (!remote) return;
-    fetch('/api/mutate', { method:'POST', credentials:'include', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ action, payload }) }).catch(()=>{});
+    if (holding) return Promise.resolve({ ok:true });
+    if (!remote) return Promise.resolve(offline);
+    return fetch('/api/mutate', { method:'POST', credentials:'include', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ action, payload }) })
+      .then(async r => {
+        const data = await r.json().catch(() => ({ ok:false, error:'The database did not answer.' }));
+        if (!r.ok || data.ok === false) return { ok:false, error: data.error || 'The database rejected that edit.' };
+        return data;
+      })
+      .catch(() => offline);
   }
 
   const blankRow = key => ({
@@ -190,34 +199,49 @@
     balance_loan_term: null
   });
 
+  const applyColumn = (row, k, v, replace) => {
+    const blank = v === undefined || v === '' || v === null;
+    if (blank && !replace) return;
+    if (blank) {
+      if (k === 'rental_restrictions') row.rental_restrictions = 'Not known';
+      else row[k] = null;
+      return;
+    }
+    if (k === 'interest_rate') row.interest_rate = Number(Number(v).toFixed(3));
+    else if (k === 'remaining_balance' || k === 'down_payment_required' || k === 'balance_loan_term') row[k] = Number(v);
+    else if (k === 'rental_restrictions') row.rental_restrictions = ['Yes','No','Not known'].includes(v) ? v : 'Not known';
+  };
   const SiteDatabase = {
     /** Full tables. The admin database screen reads this. */
     tables(){ return readDb(); },
+    hold(on){ holding = !!on; },
     reset(){},
+    /** One confirmed write of the listing's loan row and custom values. */
+    persistListing(listingKey, opts){
+      const removed = !!(opts && opts.removed);
+      const row = removed ? null : this.assumable.get(listingKey);
+      const values = this.values.list().filter(v => v.listing_key === listingKey);
+      return touch('listing.save', { listingKey, removed, row, values });
+    },
     assumable: {
       list(){ return clone(readDb().assumable_data); },
       get(listingKey){ return clone(readDb().assumable_data.find(r => r.listing_key === listingKey) || null); },
-      /** Writes only the keys you pass. Blank values are skipped, so other columns stay as they were. */
-      save(listingKey, patch){
+      /** Writes the keys you pass. A replace save stores blanks as empty. A partial save leaves other columns alone. */
+      save(listingKey, patch, opts){
         const db = readDb();
         let row = db.assumable_data.find(r => r.listing_key === listingKey);
         if (!row) { row = blankRow(listingKey); db.assumable_data.push(row); }
-        Object.entries(patch || {}).forEach(([k,v]) => {
-          if (v === undefined || v === '' || v === null) return;
-          if (k === 'interest_rate') row.interest_rate = Number(Number(v).toFixed(3));
-          else if (k === 'remaining_balance' || k === 'down_payment_required' || k === 'balance_loan_term') row[k] = Number(v);
-          else if (k === 'rental_restrictions') row.rental_restrictions = ['Yes','No','Not known'].includes(v) ? v : 'Not known';
-        });
+        const replace = !!(opts && opts.replace);
+        Object.entries(patch || {}).forEach(([k,v]) => applyColumn(row, k, v, replace));
         if (!row.rental_restrictions) row.rental_restrictions = 'Not known';
         writeDb(db);
-        touch('assumable.save', { listingKey, patch });
-        return clone(row);
+        return touch('assumable.save', { listingKey, patch, replace });
       },
       remove(listingKey){
         const db = readDb();
         db.assumable_data = db.assumable_data.filter(r => r.listing_key !== listingKey);
         writeDb(db);
-        touch('assumable.remove', { listingKey });
+        return touch('assumable.remove', { listingKey });
       },
       reset(listingKey){
         const db = readDb();
@@ -227,7 +251,7 @@
         db.custom_values = db.custom_values.filter(v => v.listing_key !== listingKey);
         SEED.custom_values.filter(v => v.listing_key === listingKey).forEach(v => db.custom_values.push(clone(v)));
         writeDb(db);
-        touch('assumable.reset', { listingKey });
+        return touch('assumable.reset', { listingKey });
       },
       isEdited(listingKey){
         const db = readDb();
@@ -247,22 +271,20 @@
         const row = {id:'cat-'+Date.now(), name:label, icon:icon || '', badge:String(badge || '').trim(), note:String(note || '').trim()};
         db.custom_categories.push(row);
         writeDb(db);
-        touch('category.create', row);
-        return {ok:true, row};
+        return touch('category.create', row).then(res => res && res.ok === false ? res : {ok:true, row});
       }
     },
     fields: {
       list(){ return clone(readDb().custom_fields); },
       create({name, category_id, type}){
         const label = String(name || '').trim();
-        if (!label) return {ok:false, error:'A field needs a name.'};
+        if (!label) return Promise.resolve({ok:false, error:'A field needs a name.'});
         const db = readDb();
         const kind = ['text','amount','yes_no'].includes(type) ? type : 'text';
         const row = {id:'fld-'+Date.now(), category_id: category_id || null, name:label, type:kind};
         db.custom_fields.push(row);
         writeDb(db);
-        touch('field.create', row);
-        return {ok:true, row};
+        return touch('field.create', row).then(res => res && res.ok === false ? res : {ok:true, row});
       }
     },
     values: {
@@ -273,7 +295,7 @@
         const stored = value !== undefined && value !== null && String(value).trim() !== '' ? String(value).trim() : '';
         if (stored) db.custom_values.push({listing_key:listingKey, field_id:fieldId, value:stored});
         writeDb(db);
-        touch('value.set', { listingKey, fieldId, value: stored });
+        return touch('value.set', { listingKey, fieldId, value: stored });
       }
     }
   };

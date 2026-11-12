@@ -95,42 +95,50 @@
   const users=()=>remote.users||[];
   const publicUser=u=>u?(({password,...rest})=>rest)(u):null;
   const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,session:null};
-  const mutate=(action,payload)=>fetch('/api/mutate',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({action,payload})}).catch(()=>{});
+  const mutate=(action,payload)=>fetch('/api/mutate',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({action,payload})}).then(async r=>{const data=await r.json().catch(()=>({ok:false,error:'The database did not answer.'}));return (!r.ok||data.ok===false)?{ok:false,error:data.error||'The database rejected that edit.'}:data;}).catch(()=>offline);
+  async function pull(){const ok=await DataPorts.connect();if(!ok||!DataPorts.remoteState)return offline;const s=DataPorts.remoteState;remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];if(s.user)remote.session=s.user;rebuild();return {ok:true};}
   const dayKey=d=>d.toISOString().slice(0,10);
   Object.assign(window.MockAPI,{
     LEAD_STATUSES,DEMO_USERS,
     customFields(){return DataPorts.db.fields.list();},
     customCategories(){return DataPorts.db.categories.list();},
-    createCategory(input){const res=DataPorts.db.categories.create(input);rebuild();return res;},
-    createField(input){const res=DataPorts.db.fields.create(input);rebuild();return res;},
+    async createCategory(input){const res=await DataPorts.db.categories.create(input);if(!res||res.ok===false){await pull();return res||offline;}rebuild();return res;},
+    async createField(input){const res=await DataPorts.db.fields.create(input);if(!res||res.ok===false){await pull();return res||offline;}rebuild();return res;},
     currentUser(){return remote.on?remote.session:null;},
     async signIn(email,password){if(!remote.on)return offline;const res=await fetch('/api/auth/sign-in',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});const data=await res.json();if(!data.ok)return data;remote.session=data.user;const state=await (await fetch('/api/state',{credentials:'include'})).json();remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;this.track('sign-in',{role:data.user.role});return data;},
     async signUp({name,email,phone,password}){if(!remote.on)return offline;const res=await fetch('/api/auth/sign-up',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({name,email,phone,password})});const data=await res.json();if(!data.ok)return data;remote.users=[...remote.users,data.user];remote.session=data.user;this.track('sign-up',{});return data;},
     signOut(){if(!remote.on)return;remote.session=null;fetch('/api/auth/sign-out',{method:'POST',credentials:'include'}).then(()=>fetch('/api/state',{credentials:'include'}).then(r=>r.json())).then(state=>{remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;});},
     getUsers(){return users().map(publicUser);},
-    updateUser(id,patch){if(!remote.on)return;const all=users();const u=all.find(x=>x.id===Number(id));if(u)Object.assign(u,patch);remote.users=all;mutate('user.update',{id:Number(id),role:patch.role});},
-    deleteUser(id){if(!remote.on)return;remote.users=users().filter(u=>u.id!==Number(id));mutate('user.delete',{id:Number(id)});},
-    updateListing(id,patch){
-      const h=homeById(id);if(!h)return;
-      const key=h.listingKey,db=DataPorts.db;
-      if(patch.assumable===false)db.assumable.remove(key);
-      else {
-        const row={};
-        if(patch.assumableRate!=null&&patch.assumableRate!=='')row.interest_rate=patch.assumableRate;
-        if(patch.loanBalance!=null&&patch.loanBalance!=='')row.remaining_balance=patch.loanBalance;
-        if(patch.downPayment!=null&&patch.downPayment!=='')row.down_payment_required=patch.downPayment;
-        if(patch.rentalRestrictions)row.rental_restrictions=patch.rentalRestrictions;
-        if(patch.loanTermMonths!=null&&patch.loanTermMonths!=='')row.balance_loan_term=patch.loanTermMonths;
-        if(patch.assumable===true||Object.keys(row).length)db.assumable.save(key,row);
-      }
-      if(patch.loanType!=null){const f=db.fields.list().find(x=>x.name==='Loan program');if(f)db.values.set(key,f.id,patch.loanType);}
-      if(Array.isArray(patch.verified)){
-        db.fields.list().filter(f=>f.category_id==='cat-verification').forEach(f=>db.values.set(key,f.id,patch.verified.includes(f.name)?'Yes':''));
-      }
-      if(patch.customValues)Object.entries(patch.customValues).forEach(([fieldId,value])=>db.values.set(key,fieldId,value));
+    async updateUser(id,patch){if(!remote.on)return offline;const all=users();const u=all.find(x=>x.id===Number(id));if(u)Object.assign(u,patch);remote.users=all;const res=await mutate('user.update',{id:Number(id),role:patch.role});if(!res.ok)await pull();return res;},
+    async deleteUser(id){if(!remote.on)return offline;remote.users=users().filter(u=>u.id!==Number(id));const res=await mutate('user.delete',{id:Number(id)});if(!res.ok)await pull();return res;},
+    async updateListing(id,patch){
+      const h=homeById(id);if(!h)return {ok:false,error:'That listing is not in the admin list.'};
+      if(!remote.on)return offline;
+      const key=h.listingKey,db=DataPorts.db,replace=!!patch.replace;
+      db.hold(true);
+      try{
+        if(patch.assumable===false)db.assumable.remove(key);
+        else {
+          const row={};
+          if(replace||(patch.assumableRate!=null&&patch.assumableRate!==''))row.interest_rate=patch.assumableRate;
+          if(replace||(patch.loanBalance!=null&&patch.loanBalance!==''))row.remaining_balance=patch.loanBalance;
+          if(replace||(patch.downPayment!=null&&patch.downPayment!==''))row.down_payment_required=patch.downPayment;
+          if(replace||patch.rentalRestrictions)row.rental_restrictions=patch.rentalRestrictions;
+          if(replace||(patch.loanTermMonths!=null&&patch.loanTermMonths!==''))row.balance_loan_term=patch.loanTermMonths;
+          if(patch.assumable===true||Object.keys(row).length)db.assumable.save(key,row,{replace});
+        }
+        if(patch.loanType!=null){const f=db.fields.list().find(x=>x.name==='Loan program');if(f)db.values.set(key,f.id,patch.loanType);}
+        if(Array.isArray(patch.verified)){
+          db.fields.list().filter(f=>f.category_id==='cat-verification').forEach(f=>db.values.set(key,f.id,patch.verified.includes(f.name)?'Yes':''));
+        }
+        if(patch.customValues)Object.entries(patch.customValues).forEach(([fieldId,value])=>db.values.set(key,fieldId,value));
+      }finally{db.hold(false);}
+      const res=await db.persistListing(key,{removed:patch.assumable===false});
+      if(!res||res.ok===false){await pull();return res||offline;}
       rebuild();
+      return {ok:true};
     },
-    resetListing(id){const h=homeById(id);if(h)DataPorts.db.assumable.reset(h.listingKey);rebuild();},
+    async resetListing(id){const h=homeById(id);if(!h)return {ok:false,error:'That listing is not in the admin list.'};if(!remote.on)return offline;const res=await DataPorts.db.assumable.reset(h.listingKey);if(!res||res.ok===false){await pull();return res||offline;}rebuild();return {ok:true};},
     isEdited(id){const h=homeById(id);return h?DataPorts.db.assumable.isEdited(h.listingKey):false;},
     getLeads(){return remote.on?remote.leads:[];},
     setLeadStatus(id,status){if(!remote.on)return;remote.leads.forEach(l=>{if(String(l.id)===String(id))l.status=status});mutate('lead.status',{id,status});},
