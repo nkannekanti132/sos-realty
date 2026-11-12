@@ -858,10 +858,6 @@ em.up{color:#1f7a52}em.down{color:#c03636}
 .adm-import-log li{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:baseline;padding:8px 10px;border-radius:8px;background:#f7f4ee;font-size:13px}
 .adm-import-log li.wait{background:#fff4dc}.adm-import-log li.ok{background:#e5f3ec}.adm-import-log li.bad{background:#fdecec}
 .adm-import-log li span{color:#3d4654}
-.adm-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;margin-top:12px;border-radius:12px;background:#0a1830;color:#fff}
-.adm-bulk b{margin-right:8px;font-size:14px}
-.adm-bulk button:not(.adm-link){display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid rgba(255,255,255,.25);border-radius:8px;background:none;color:#fff;font:600 13px 'DM Sans',sans-serif;cursor:pointer}
-.adm-bulk button:not(.adm-link):hover{border-color:#e7d3a1;color:#e7d3a1}.adm-bulk .adm-link{color:#e7d3a1}
 .adm-table-wrap{overflow-x:auto;border:1px solid #e6e1d5;border-radius:14px;background:#fff}
 .adm-panel .adm-table-wrap{border:0;border-radius:0}
 .adm-table{width:100%;border-collapse:collapse;font-size:14px}
