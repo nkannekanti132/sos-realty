@@ -848,7 +848,7 @@ em.up{color:#1f7a52}em.down{color:#c03636}
 .adm-search{flex:1 1 260px;position:relative}
 .adm-search input{width:100%;padding-left:38px;box-sizing:border-box;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa1ad' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px center/17px}
 .adm-filters select:focus,.adm-search input:focus{outline:none;border-color:#c9a24e;box-shadow:0 0 0 3px rgba(201,162,78,.18)}
-.adm-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;margin-bottom:12px;border-radius:12px;background:#0a1830;color:#fff}
+.adm-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;margin-top:12px;border-radius:12px;background:#0a1830;color:#fff}
 .adm-bulk b{margin-right:8px;font-size:14px}
 .adm-bulk button:not(.adm-link){display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid rgba(255,255,255,.25);border-radius:8px;background:none;color:#fff;font:600 13px 'DM Sans',sans-serif;cursor:pointer}
 .adm-bulk button:not(.adm-link):hover{border-color:#e7d3a1;color:#e7d3a1}.adm-bulk .adm-link{color:#e7d3a1}
