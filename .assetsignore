@@ -1,0 +1,8 @@
+worker.js
+schema.sql
+wrangler.jsonc
+.git
+.gitignore
+.assetsignore
+README.md
+**/.DS_Store

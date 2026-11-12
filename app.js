@@ -1,6 +1,5 @@
-/* Janardhan Vangala / SOS Realty Group — frontend-only interactive experience.
-   All data is fictional demo content served by window.MockAPI (mock-backend.js).
-   Uses photographs and accessible controls; no 3D or canvas scene. */
+/* Janardhan Vangala / SOS Realty Group.
+   Listing facts come from the mock Trestle feed. Everything else is saved in the database. */
 (() => {
   'use strict';
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -126,7 +125,7 @@
       <div class="modal-property-image" style="background-image:url('${listing.image}')"><span>ILLUSTRATIVE DEMO LISTING · NOT FOR SALE</span></div>
       <div class="modal-property-copy"><span class="mini-label">${listing.tag} · ${listing.city.toUpperCase()}</span><h2 id="modalTitle">${listing.name}</h2><span class="modal-price">${money(listing.price)}</span>
       <p>${listing.description}</p><div class="modal-detail-grid"><span>BEDROOMS<strong>${listing.beds}</strong></span><span>BATHROOMS<strong>${listing.baths}</strong></span><span>SQUARE FEET<strong>${listing.sqft.toLocaleString()}</strong></span></div>
-      <p>Explore your next chapter in ${listing.city}. This is an example property for interface demonstration only.</p>
+      <p>Explore your next chapter in ${listing.city}. Price and photos come from the mock Trestle feed.</p>
       <div class="modal-actions"><button type="button" class="btn btn-dark" id="modalInquiry">Ask about homes like this <span class="btn-arrow">↗</span></button><button type="button" class="btn modal-secondary" id="modalFavorite">${MockAPI.getFavorites().includes(listing.id)?'♥ Saved':'♡ Save home'}</button></div></div></div>`);
     $('#modalInquiry').addEventListener('click', () => {
       closeModal();
@@ -138,11 +137,11 @@
       const favorites=MockAPI.toggleFavorite(listing.id);
       $('#modalFavorite').textContent = favorites.includes(listing.id) ? '♥ Saved' : '♡ Save home';
       renderListings();
-      toast(favorites.includes(listing.id)?'Home saved to your demo favorites.':'Home removed from your demo favorites.');
+      toast(favorites.includes(listing.id)?'Home saved.':'Home removed from saved homes.');
     });
   }
   function searchModal() {
-    openModal(`<div class="modal-simple"><span class="mini-label">FIND YOUR PLACE</span><h2 id="modalTitle">Where does your story begin?</h2><p>Browse our sample collection by neighborhood and discover a home that fits your next chapter.</p>
+    openModal(`<div class="modal-simple"><span class="mini-label">FIND YOUR PLACE</span><h2 id="modalTitle">Where does your story begin?</h2><p>Browse homes by neighborhood. Listing facts come from the mock Trestle feed.</p>
     <form class="modal-form" id="areaSearch"><label>SELECT AN AREA<select id="citySelect" aria-label="Select a neighborhood"><option value="">All four Las Vegas Valley communities</option>${['Las Vegas','Henderson','North Las Vegas','Boulder City'].map(s=>`<option value="${s}" ${currentCity===s?'selected':''}>${s}</option>`).join('')}</select></label><button type="submit" class="btn btn-dark">Explore homes <span class="btn-arrow">↗</span></button></form></div>`);
     $('#areaSearch').addEventListener('submit', e => {e.preventDefault();currentCity=$('#citySelect').value;closeModal();renderListings();$('#homes').scrollIntoView({behavior:reducedMotion?'auto':'smooth'});});
   }
@@ -153,16 +152,15 @@
     $('#askArea').addEventListener('click',()=>{closeModal();$('#contactForm [name=message]').value=`I'd love to learn more about the ${area} real estate market.`;$('#contact').scrollIntoView({behavior:reducedMotion?'auto':'smooth'});});
   }
   function valuationModal() {
-    openModal(`<div class="modal-simple"><span class="mini-label">START WITH A CONVERSATION</span><h2 id="modalTitle">Curious what your home could be worth?</h2><p>Tell us a little about your property. This demo saves the request locally; no automatic valuation is generated and no request is sent.</p>
+    openModal(`<div class="modal-simple"><span class="mini-label">START WITH A CONVERSATION</span><h2 id="modalTitle">Curious what your home could be worth?</h2><p>Tell us a little about your property. Your request is saved to the database.</p>
       <form class="modal-form" id="valuationForm"><label>PROPERTY ADDRESS<input type="text" name="address" required placeholder="Street address, city, ZIP" /></label><div class="input-row"><label>YOUR NAME<input type="text" name="name" required placeholder="Full name" /></label><label>EMAIL ADDRESS<input type="email" name="email" required placeholder="you@example.com" /></label></div><button type="submit" class="btn btn-dark">Save valuation request <span>↗</span></button><p class="modal-status" id="valuationStatus" role="status"></p></form></div>`);
     $('#valuationForm').addEventListener('submit', async e => {
       e.preventDefault();const form=e.currentTarget;if(!form.reportValidity())return;
       const data=Object.fromEntries(new FormData(form));
-      const status=$('#valuationStatus');status.textContent='Saving your demo request...';
-      await MockAPI.saveInquiry({...data,intent:'valuation'});
-      status.textContent='Saved locally for this demo. No message was sent.';
-      form.reset();
-      toast('Valuation request saved locally.');
+      const status=$('#valuationStatus');status.textContent='Saving your request...';
+      const res=await MockAPI.saveInquiry({...data,intent:'valuation',source:'valuation',home:data.address||'—'});
+      status.textContent=res&&res.success?'Saved to the database.':(res&&res.error)||'The database is not connected.';
+      if(res&&res.success){form.reset();toast('Valuation request saved.');}
     });
   }
   function guideModal(key) {
@@ -171,7 +169,7 @@
     $('#guideContact').addEventListener('click',()=>{closeModal();$('#contact').scrollIntoView({behavior:reducedMotion?'auto':'smooth'});});
   }
   function calculatorModal() {
-    openModal(`<div class="modal-simple"><span class="mini-label">PAYMENT ESTIMATOR · DEMO TOOL</span><h2 id="modalTitle">Know your numbers.</h2><p>Adjust the figures to see an illustrative monthly principal-and-interest payment.</p>
+    openModal(`<div class="modal-simple"><span class="mini-label">PAYMENT ESTIMATOR</span><h2 id="modalTitle">Know your numbers.</h2><p>Adjust the figures to see an illustrative monthly principal-and-interest payment.</p>
       <div class="calculator-fields"><label>HOME PRICE ($)<input id="calcPrice" type="number" min="1" max="100000000" step="1000" value="650000" /></label><label>DOWN PAYMENT (%)<input id="calcDown" type="number" min="0" max="100" step="1" value="20" /></label><label>INTEREST RATE (%)<input id="calcRate" type="number" min="0" max="30" step=".1" value="6.5" /></label><label>LOAN TERM (YEARS)<input id="calcTerm" type="number" min="1" max="40" step="1" value="30" /></label></div>
       <div class="calculator-result"><span>ESTIMATED MONTHLY PRINCIPAL + INTEREST</span><strong id="calcTotal">$0</strong></div><p class="calculator-disclaimer">Estimate only. Excludes taxes, insurance, HOA fees, PMI, and other expenses. Not a lender quote or financing offer.</p></div>`);
     const calculate = () => {
@@ -193,7 +191,7 @@
     $('#searchOpen').addEventListener('click',()=>window.RealEstateStudio?.open('search'));
     $('#listingGrid').addEventListener('click',async e=>{
       const favorite=e.target.closest('[data-favorite]');
-      if(favorite){const id=Number(favorite.dataset.favorite),favorites=MockAPI.toggleFavorite(id);favorite.classList.toggle('is-saved',favorites.includes(id));favorite.textContent=favorites.includes(id)?'♥':'♡';favorite.setAttribute('aria-pressed',String(favorites.includes(id)));favorite.setAttribute('aria-label',favorites.includes(id)?'Remove from favorites':'Add to favorites');toast(favorites.includes(id)?'Saved to your demo favorites.':'Removed from favorites.');return;}
+      if(favorite){const id=Number(favorite.dataset.favorite),favorites=MockAPI.toggleFavorite(id);favorite.classList.toggle('is-saved',favorites.includes(id));favorite.textContent=favorites.includes(id)?'♥':'♡';favorite.setAttribute('aria-pressed',String(favorites.includes(id)));favorite.setAttribute('aria-label',favorites.includes(id)?'Remove from favorites':'Add to favorites');toast(DataPorts.mode==='database'?(favorites.includes(id)?'Saved.':'Removed from saved homes.'):'The database is not connected.');return;}
       const button=e.target.closest('[data-open-listing]');if(button){const listing=await MockAPI.getListing(button.dataset.openListing);if(listing)listingModal(listing);}
     });
     $$('.area-card').forEach(card=>card.addEventListener('click',()=>window.RealEstateStudio?.open('community-detail',{city:card.dataset.area})));
@@ -205,8 +203,8 @@
       e.preventDefault();const form=e.currentTarget;const status=$('#formStatus');
       if(!form.reportValidity()){status.textContent='Please complete your name, email, and the type of move.';status.classList.add('error');return;}
       const button=$('button[type=submit]',form);button.disabled=true;button.querySelector('span').textContent='Saving...';status.textContent='';status.classList.remove('error');
-      try{await MockAPI.saveInquiry(Object.fromEntries(new FormData(form)));status.textContent='Your message has been saved in this demo browser. No email was sent.';form.reset();toast('Demo message saved locally.');}
-      catch{status.textContent='Could not save the demo message. Please try again.';status.classList.add('error');}
+      try{const res=await MockAPI.saveInquiry({...Object.fromEntries(new FormData(form)),source:'contact',intent:form.intent?.value||'info'});status.textContent=res&&res.success?'Your message was saved to the database.':(res&&res.error)||'The database is not connected.';if(res&&res.success){form.reset();toast('Message saved.');}}
+      catch{status.textContent='Could not save the message. Please try again.';status.classList.add('error');}
       finally{button.disabled=false;button.querySelector('span').textContent='Send your message';}
     });
   }
@@ -218,5 +216,5 @@
     $('#reviewCount').textContent=`${String(reviewIndex+1).padStart(2,'0')} / ${String(MockAPI.testimonials.length).padStart(2,'0')}`;
   }
 
-  document.addEventListener('DOMContentLoaded',()=>{initPage();initInteractions();renderListings();});
+  document.addEventListener('DOMContentLoaded',async()=>{if(window.DataPorts?.ready)await DataPorts.ready;initPage();initInteractions();renderListings();});
 })();

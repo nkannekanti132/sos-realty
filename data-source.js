@@ -7,16 +7,14 @@
  *      for the live key. They already return Promises of RESO-shaped records.
  *      Do not copy those records into our database.
  *   2. Our database — Assumable Data, custom categories, fields, and values.
- *      Swap SiteDatabase for the Cloudflare Worker. Same method names.
+ *      Loaded from the Worker. Nothing here is stored in the browser.
  *      A home is assumable only when it has a row here, joined on listing_key.
  *
- * SAMPLE_PRESENTATION is demo labeling (concept names, tags). The adapter
- * falls back to the street address and the Media URLs when it is absent.
+ * SAMPLE_PRESENTATION is part of the mock Trestle feed (concept names, tags).
+ * The adapter falls back to the street address and the Media URLs when it is absent.
  */
 (function () {
   'use strict';
-
-  const DB_KEY = 'sos_janardhan_demo_db';
 
   // Compact sample rows. Expanded below into RESO Property resources.
   // [key, name, city, zip, price, beds, baths, sqft, subType, status, dom, garage, stories, hoa, views, subdivision, features, lat, lng, year, lot, tag, featured, fresh, tour, categories, closeDate]
@@ -58,7 +56,7 @@
     PropertySubType: r[8],
     ListPrice: r[4],
     ClosePrice: r[9]==='Closed' ? r[4] : null,
-    CloseDate: r[16] || null,
+    CloseDate: r[26] || null,
     BedroomsTotal: r[5],
     BathroomsTotalInteger: r[6],
     LivingArea: r[7],
@@ -168,17 +166,18 @@
     custom_values: SEED_VALUES
   };
 
+  let memory = null;
+  let remote = false;
+  const emptyDb = () => ({ assumable_data: [], custom_categories: [], custom_fields: [], custom_values: [] });
   function readDb(){
-    try {
-      const raw = localStorage.getItem(DB_KEY);
-      if (!raw) return clone(SEED);
-      const parsed = JSON.parse(raw);
-      if (!parsed || !Array.isArray(parsed.assumable_data)) return clone(SEED);
-      return parsed;
-    } catch { return clone(SEED); }
+    return remote && memory ? memory : emptyDb();
   }
   function writeDb(db){
-    try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {}
+    if (remote) memory = db;
+  }
+  function touch(action, payload){
+    if (!remote) return;
+    fetch('/api/mutate', { method:'POST', credentials:'include', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ action, payload }) }).catch(()=>{});
   }
 
   const blankRow = key => ({
@@ -194,7 +193,7 @@
   const SiteDatabase = {
     /** Full tables. The admin database screen reads this. */
     tables(){ return readDb(); },
-    reset(){ try { localStorage.removeItem(DB_KEY); } catch {} },
+    reset(){},
     assumable: {
       list(){ return clone(readDb().assumable_data); },
       get(listingKey){ return clone(readDb().assumable_data.find(r => r.listing_key === listingKey) || null); },
@@ -211,12 +210,14 @@
         });
         if (!row.rental_restrictions) row.rental_restrictions = 'Not known';
         writeDb(db);
+        touch('assumable.save', { listingKey, patch });
         return clone(row);
       },
       remove(listingKey){
         const db = readDb();
         db.assumable_data = db.assumable_data.filter(r => r.listing_key !== listingKey);
         writeDb(db);
+        touch('assumable.remove', { listingKey });
       },
       reset(listingKey){
         const db = readDb();
@@ -226,6 +227,7 @@
         db.custom_values = db.custom_values.filter(v => v.listing_key !== listingKey);
         SEED.custom_values.filter(v => v.listing_key === listingKey).forEach(v => db.custom_values.push(clone(v)));
         writeDb(db);
+        touch('assumable.reset', { listingKey });
       },
       isEdited(listingKey){
         const db = readDb();
@@ -245,6 +247,7 @@
         const row = {id:'cat-'+Date.now(), name:label, icon:icon || '', badge:String(badge || '').trim(), note:String(note || '').trim()};
         db.custom_categories.push(row);
         writeDb(db);
+        touch('category.create', row);
         return {ok:true, row};
       }
     },
@@ -258,6 +261,7 @@
         const row = {id:'fld-'+Date.now(), category_id: category_id || null, name:label, type:kind};
         db.custom_fields.push(row);
         writeDb(db);
+        touch('field.create', row);
         return {ok:true, row};
       }
     },
@@ -266,10 +270,10 @@
       set(listingKey, fieldId, value){
         const db = readDb();
         db.custom_values = db.custom_values.filter(v => !(v.listing_key === listingKey && v.field_id === fieldId));
-        if (value !== undefined && value !== null && String(value).trim() !== '') {
-          db.custom_values.push({listing_key:listingKey, field_id:fieldId, value:String(value).trim()});
-        }
+        const stored = value !== undefined && value !== null && String(value).trim() !== '' ? String(value).trim() : '';
+        if (stored) db.custom_values.push({listing_key:listingKey, field_id:fieldId, value:stored});
         writeDb(db);
+        touch('value.set', { listingKey, fieldId, value: stored });
       }
     }
   };
@@ -359,6 +363,25 @@
     return join(properties, media, houses);
   }
 
+  async function connect(){
+    try {
+      const res = await fetch('/api/state', { credentials: 'include' });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data || data.mode !== 'database' || !Array.isArray(data.assumable_data)) return false;
+      memory = {
+        assumable_data: data.assumable_data,
+        custom_categories: data.custom_categories,
+        custom_fields: data.custom_fields,
+        custom_values: data.custom_values
+      };
+      remote = true;
+      DataPorts.mode = 'database';
+      DataPorts.remoteState = data;
+      return true;
+    } catch { return false; }
+  }
+
   window.DataPorts = {
     mode: 'mock',
     fetchTrestleProperties,
@@ -366,6 +389,9 @@
     fetchTrestleOpenHouses,
     db: SiteDatabase,
     catalog,
-    loadCatalog
+    loadCatalog,
+    connect,
+    remoteState: null
   };
+  DataPorts.ready = connect();
 })();

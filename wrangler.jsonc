@@ -1,7 +1,17 @@
 {
   "name": "sos-realty",
+  "main": "worker.js",
   "compatibility_date": "2026-11-11",
   "assets": {
-    "directory": "."
-  }
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sos-realty",
+      "database_id": "00000000-0000-4000-8000-000000000001"
+    }
+  ]
 }

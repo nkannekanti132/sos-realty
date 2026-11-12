@@ -1,9 +1,8 @@
 /**
- * SOS Realty Group / Janardhan Vangala — LOCAL-ONLY FRONTEND DEMO.
+ * SOS Realty Group / Janardhan Vangala.
  * Listing facts come from the mock Trestle feed in data-source.js.
- * Assumable facts come only from the Assumable Data table in that same file.
- * Swap those two ports when the live key and Cloudflare database are connected.
- * No live MLS, authentication provider, or email provider is connected.
+ * Users, leads, favorites, searches, alerts, events, and assumable rows
+ * come from the database. This file does not keep a browser copy of them.
  */
 (function () {
   'use strict';
@@ -59,20 +58,16 @@
     {name:'Options explained',role:'BUYER GUIDANCE',quote:'From financing choices to neighborhood fit, the goal is to make each decision clearer.'},
     {name:'Thoughtful planning',role:'SELLER GUIDANCE',quote:'Pricing, preparation and timing are discussed in plain language, with your plans at the center.'}
   ];
-  const cache={};
-  const get=k=>{try{return JSON.parse(localStorage.getItem(k)||'[]')}catch{return cache[k]||[]}};
-  const set=(k,v)=>{cache[k]=v;try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-  const KEY='sos_janardhan_demo_';
   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const offline={ok:false,success:false,error:'The database is not connected.'};
   window.MockAPI={
     listings,communities,soldListings,testimonials,
     async getListings(filters={}){await pause(50);return listings.filter(h=>(!filters.category||filters.category==='all'||h.category.includes(filters.category))&&(!filters.city||h.city.toLowerCase().includes(filters.city.toLowerCase())));},
     async getListing(id){await pause(45);return listings.find(h=>h.id===Number(id))||null;},
     async getTestimonials(){return testimonials;},
-    async saveInquiry(data){await pause(150);const list=get(KEY+'inquiries');list.push({...data,id:Date.now(),submittedAt:new Date().toISOString()});set(KEY+'inquiries',list);return{success:true,demo:true};},
-    getInquiries(){return get(KEY+'inquiries');},
-    getFavorites(){return get(KEY+'favorites');},
-    toggleFavorite(id){const a=get(KEY+'favorites');const updated=a.includes(id)?a.filter(x=>x!==id):[...a,id];set(KEY+'favorites',updated);return updated;},
+    async saveInquiry(data){await pause(150);if(!remote.on)return offline;const row={...data,id:'L-'+Date.now(),submittedAt:new Date().toISOString(),status:'New',home:data.home||data.property||'—',sample:false};remote.leads=[row,...remote.leads];mutate('lead.add',row);return{success:true};},
+    getFavorites(){return remote.on?remote.favorites:[];},
+    toggleFavorite(id){const homeId=Number(id);if(!remote.on)return [];remote.favorites=remote.favorites.includes(homeId)?remote.favorites.filter(x=>x!==homeId):[...remote.favorites,homeId];mutate('favorite.toggle',{homeId});return remote.favorites;},
     async getAdvancedListings(filters={}){await pause(50);return listings.filter(h=>
       (!filters.city||h.city.toLowerCase().includes(String(filters.city).toLowerCase()))&&
       (!filters.keyword||(h.name+' '+h.city+' '+h.description).toLowerCase().includes(String(filters.keyword).toLowerCase()))&&
@@ -82,60 +77,39 @@
       (!filters.openOnly||Boolean(h.openHouse))&&(!filters.featuredOnly||h.featured)&&
       (!filters.newOnly||h.newListing)&&(!filters.assumableOnly||h.assumable)
     ).sort((a,b)=>filters.sort==='price-asc'?a.price-b.price:filters.sort==='price-desc'?b.price-a.price:a.id-b.id);},
-    getSavedSearches(){return get(KEY+'saved_searches');},
-    async saveSearch(data){const a=get(KEY+'saved_searches'),v={...data,id:Date.now()+Math.round(Math.random()*100),createdAt:new Date().toISOString()};a.unshift(v);set(KEY+'saved_searches',a);return v;},
-    removeSavedSearch(id){set(KEY+'saved_searches',get(KEY+'saved_searches').filter(x=>String(x.id)!==String(id)));},
-    getAlerts(){return get(KEY+'alerts');},
-    async subscribeAlerts(data){const a=get(KEY+'alerts'),v={...data,id:Date.now(),active:true,createdAt:new Date().toISOString()};a.unshift(v);set(KEY+'alerts',a);return v;},
-    toggleAlert(id){const a=get(KEY+'alerts');a.forEach(x=>{if(String(x.id)===String(id))x.active=!x.active});set(KEY+'alerts',a);return a;},
-    getDemoAccount(){return get(KEY+'account')[0]||null;},
-    setDemoAccount(email){set(KEY+'account',[{email,signedInAt:new Date().toISOString()}]);},
-    clearDemoAccount(){set(KEY+'account',[]);}
+    getSavedSearches(){return remote.on?remote.searches:[];},
+    async saveSearch(data){if(!remote.on)return offline;const v={...data,id:'S-'+Date.now(),createdAt:new Date().toISOString()};remote.searches=[v,...remote.searches];const {id,createdAt,...rest}=v;mutate('search.save',{id,createdAt,data:rest});return v;},
+    removeSavedSearch(id){if(!remote.on)return;remote.searches=remote.searches.filter(x=>String(x.id)!==String(id));mutate('search.remove',{id});},
+    getAlerts(){return remote.on?remote.alerts:[];},
+    async subscribeAlerts(data){if(!remote.on)return offline;const v={...data,id:'A-'+Date.now(),active:true,createdAt:new Date().toISOString()};remote.alerts=[v,...remote.alerts];const {id,active,createdAt,...rest}=v;mutate('alert.save',{id,createdAt,data:rest});return v;},
+    toggleAlert(id){if(!remote.on)return [];remote.alerts.forEach(x=>{if(String(x.id)===String(id))x.active=!x.active});mutate('alert.toggle',{id});return remote.alerts;}
   };
 
-  /* ---- Mock auth, admin data and analytics (browser storage only, plaintext demo passwords) ---- */
+  /* Accounts below only pre-fill the sign-in form. The user rows live in the database. */
   const DEMO_USERS=[
-    {id:1,name:'Janardhan Vangala',email:'admin@sosrealty.demo',password:'Admin@2026',role:'admin',phone:'(702) 215-1838',createdAt:'2026-09-01T16:00:00Z',seed:true},
-    {id:2,name:'Alex Morgan',email:'buyer@sosrealty.demo',password:'Buyer@2026',role:'user',phone:'(702) 555-0142',createdAt:'2026-10-04T18:20:00Z',seed:true},
-    {id:3,name:'Priya Natarajan',email:'priya.n@example.com',password:null,role:'user',phone:'(702) 555-0175',createdAt:'2026-10-12T15:05:00Z',seed:true},
-    {id:4,name:'Marcus Reed',email:'marcus.reed@example.com',password:null,role:'user',phone:'(725) 555-0110',createdAt:'2026-10-19T21:40:00Z',seed:true},
-    {id:5,name:'Dana Whitfield',email:'dana.w@example.com',password:null,role:'user',phone:'',createdAt:'2026-10-28T17:12:00Z',seed:true},
-    {id:6,name:'Luis Ortega',email:'l.ortega@example.com',password:null,role:'user',phone:'(702) 555-0193',createdAt:'2026-11-03T14:30:00Z',seed:true}
-  ];
-  const SAMPLE_LEADS=[
-    {id:'L-1001',name:'Priya Natarajan',email:'priya.n@example.com',phone:'(702) 555-0175',intent:'tour',source:'property-detail',home:'The North Star',message:'Can we see it Saturday? We have a VA certificate.',submittedAt:'2026-11-08T16:22:00Z',sample:true},
-    {id:'L-1002',name:'Marcus Reed',email:'marcus.reed@example.com',phone:'(725) 555-0110',intent:'buy',source:'assumable',home:'The Heritage House',message:'Interested in assuming the 2.25% VA loan.',submittedAt:'2026-11-07T19:03:00Z',sample:true},
-    {id:'L-1003',name:'Grace Kim',email:'grace.kim@example.com',phone:'',intent:'sell',source:'valuation',home:'—',message:'Henderson 4 bed, thinking of listing in spring.',submittedAt:'2026-11-06T13:47:00Z',sample:true},
-    {id:'L-1004',name:'Dana Whitfield',email:'dana.w@example.com',phone:'',intent:'info',source:'search',home:'The Desert Horizon',message:'What is the equity gap on this one?',submittedAt:'2026-11-04T22:15:00Z',sample:true},
-    {id:'L-1005',name:'Tom Becker',email:'tbecker@example.com',phone:'(702) 555-0128',intent:'buy',source:'community-detail',home:'—',message:'Relocating from Denver, Boulder City only.',submittedAt:'2026-11-02T17:30:00Z',sample:true},
-    {id:'L-1006',name:'Luis Ortega',email:'l.ortega@example.com',phone:'(702) 555-0193',intent:'tour',source:'map',home:'The Mesa Collection',message:'FHA assumption — what credit score is needed?',submittedAt:'2026-10-30T15:58:00Z',sample:true}
+    {email:'admin@sosrealty.demo',password:'Admin@2026',role:'admin',name:'Janardhan Vangala'},
+    {email:'buyer@sosrealty.demo',password:'Buyer@2026',role:'user',name:'Alex Morgan'}
   ];
   const LEAD_STATUSES=['New','Contacted','Touring','Under contract','Closed','Lost'];
   const homeById=id=>listings.find(h=>h.id===Number(id));
-  const users=()=>{const stored=get(KEY+'users');return stored.length?stored:DEMO_USERS.map(u=>({...u}));};
+  const users=()=>remote.users||[];
   const publicUser=u=>u?(({password,...rest})=>rest)(u):null;
-  const seeded=seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+  const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,session:null};
+  const mutate=(action,payload)=>fetch('/api/mutate',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({action,payload})}).catch(()=>{});
   const dayKey=d=>d.toISOString().slice(0,10);
   Object.assign(window.MockAPI,{
-    LEAD_STATUSES,DEMO_USERS:DEMO_USERS.filter(u=>u.password).map(u=>({email:u.email,password:u.password,role:u.role,name:u.name})),
+    LEAD_STATUSES,DEMO_USERS,
     customFields(){return DataPorts.db.fields.list();},
     customCategories(){return DataPorts.db.categories.list();},
     createCategory(input){const res=DataPorts.db.categories.create(input);rebuild();return res;},
     createField(input){const res=DataPorts.db.fields.create(input);rebuild();return res;},
-    currentUser(){const s=get(KEY+'session')[0];if(!s)return null;return publicUser(users().find(u=>u.id===s.userId));},
-    signIn(email,password){const u=users().find(x=>x.email.toLowerCase()===String(email).trim().toLowerCase());
-      if(!u)return{ok:false,error:'No account uses that email. Create one, or use a demo account below.'};
-      if(!u.password||u.password!==password)return{ok:false,error:'That password does not match. Check it and try again.'};
-      set(KEY+'session',[{userId:u.id,at:new Date().toISOString()}]);this.track('sign-in',{role:u.role});return{ok:true,user:publicUser(u)};},
-    signUp({name,email,phone,password}){const all=users(),e=String(email).trim().toLowerCase();
-      if(all.some(u=>u.email.toLowerCase()===e))return{ok:false,error:'An account with that email already exists. Sign in instead.'};
-      if(String(password).length<8)return{ok:false,error:'Use a password with at least 8 characters.'};
-      const u={id:Math.max(...all.map(x=>x.id))+1,name:String(name).trim(),email:e,phone:phone||'',password,role:'user',createdAt:new Date().toISOString()};
-      set(KEY+'users',[...all,u]);set(KEY+'session',[{userId:u.id,at:u.createdAt}]);this.track('sign-up',{});return{ok:true,user:publicUser(u)};},
-    signOut(){set(KEY+'session',[]);},
+    currentUser(){return remote.on?remote.session:null;},
+    async signIn(email,password){if(!remote.on)return offline;const res=await fetch('/api/auth/sign-in',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});const data=await res.json();if(!data.ok)return data;remote.session=data.user;const state=await (await fetch('/api/state',{credentials:'include'})).json();remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;this.track('sign-in',{role:data.user.role});return data;},
+    async signUp({name,email,phone,password}){if(!remote.on)return offline;const res=await fetch('/api/auth/sign-up',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({name,email,phone,password})});const data=await res.json();if(!data.ok)return data;remote.users=[...remote.users,data.user];remote.session=data.user;this.track('sign-up',{});return data;},
+    signOut(){if(!remote.on)return;remote.session=null;fetch('/api/auth/sign-out',{method:'POST',credentials:'include'}).then(()=>fetch('/api/state',{credentials:'include'}).then(r=>r.json())).then(state=>{remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;});},
     getUsers(){return users().map(publicUser);},
-    updateUser(id,patch){const all=users();const u=all.find(x=>x.id===Number(id));if(u)Object.assign(u,patch);set(KEY+'users',all);},
-    deleteUser(id){set(KEY+'users',users().filter(u=>u.id!==Number(id)));},
+    updateUser(id,patch){if(!remote.on)return;const all=users();const u=all.find(x=>x.id===Number(id));if(u)Object.assign(u,patch);remote.users=all;mutate('user.update',{id:Number(id),role:patch.role});},
+    deleteUser(id){if(!remote.on)return;remote.users=users().filter(u=>u.id!==Number(id));mutate('user.delete',{id:Number(id)});},
     updateListing(id,patch){
       const h=homeById(id);if(!h)return;
       const key=h.listingKey,db=DataPorts.db;
@@ -158,18 +132,22 @@
     },
     resetListing(id){const h=homeById(id);if(h)DataPorts.db.assumable.reset(h.listingKey);rebuild();},
     isEdited(id){const h=homeById(id);return h?DataPorts.db.assumable.isEdited(h.listingKey):false;},
-    getLeads(){const st=get(KEY+'lead_status')[0]||{};return [...this.getInquiries().map(x=>({...x,id:String(x.id),home:x.property||x.home||'—'})),...SAMPLE_LEADS].map(l=>({...l,status:st[l.id]||'New'})).sort((a,b)=>String(b.submittedAt).localeCompare(String(a.submittedAt)));},
-    setLeadStatus(id,status){const st=get(KEY+'lead_status')[0]||{};st[id]=status;set(KEY+'lead_status',[st]);},
-    track(type,data={}){const ev=get(KEY+'events');ev.push({type,...data,at:new Date().toISOString()});set(KEY+'events',ev.slice(-3000));},
-    getEvents(){return get(KEY+'events');},
-    getAnalytics(days=30){const rnd=seeded(2026),today=new Date(),out=[],real=this.getEvents();
-      const realBy={};real.forEach(e=>{const k=String(e.at).slice(0,10);(realBy[k]=realBy[k]||{views:0,searches:0,saves:0});if(e.type==='view')realBy[k].views++;if(e.type==='search')realBy[k].searches++;if(e.type==='favorite')realBy[k].saves++;});
-      const leadsBy={};this.getLeads().forEach(l=>{const k=String(l.submittedAt).slice(0,10);leadsBy[k]=(leadsBy[k]||0)+1;});
-      for(let i=179;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()-i),wk=[.82,1,.95,.97,1.04,1.22,1.18][d.getDay()],trend=1+(179-i)/420;
-        const visitors=Math.round((118+rnd()*46)*wk*trend),r=realBy[dayKey(d)]||{views:0,searches:0,saves:0},k=[rnd(),rnd(),rnd(),rnd()];
-        if(i<days*2)out.push({date:dayKey(d),visitors:visitors+(r.views?1:0),views:Math.round(visitors*(2.4+k[0]*.7))+r.views,searches:Math.round(visitors*(.55+k[1]*.2))+r.searches,saves:Math.round(visitors*(.06+k[2]*.04))+r.saves,leads:Math.round(visitors*(.012+k[3]*.012))+(leadsBy[dayKey(d)]||0)});}
+    getLeads(){return remote.on?remote.leads:[];},
+    setLeadStatus(id,status){if(!remote.on)return;remote.leads.forEach(l=>{if(String(l.id)===String(id))l.status=status});mutate('lead.status',{id,status});},
+    track(type,data={}){if(!remote.on)return;const row={type,...data,at:new Date().toISOString()};remote.events.push(row);mutate('event.add',{type,data,at:row.at});},
+    getEvents(){return remote.on?remote.events:[];},
+    getAnalytics(days=30){const today=new Date(),out=[],real=this.getEvents(),realBy={},leadsBy={};
+      real.forEach(e=>{const k=String(e.at).slice(0,10);const bucket=realBy[k]=realBy[k]||{views:0,searches:0,saves:0,visitors:0};if(e.type==='view'){bucket.views++;bucket.visitors++;}if(e.type==='search')bucket.searches++;if(e.type==='favorite')bucket.saves++;});
+      this.getLeads().forEach(l=>{const k=String(l.submittedAt).slice(0,10);leadsBy[k]=(leadsBy[k]||0)+1;});
+      for(let i=days*2-1;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()-i),k=dayKey(d),r=realBy[k]||{views:0,searches:0,saves:0,visitors:0};out.push({date:k,visitors:r.visitors,views:r.views,searches:r.searches,saves:r.saves,leads:leadsBy[k]||0});}
       return out;},
     exportAll(){const tables=DataPorts.db.tables();return {trestle_properties:DataPorts.catalog().map(h=>({listingKey:h.listingKey,reference:h.reference,name:h.name,city:h.city,price:h.price,beds:h.beds,baths:h.baths,sqft:h.sqft,status:h.status,address:h.address})),assumable_data:tables.assumable_data,custom_categories:tables.custom_categories,custom_fields:tables.custom_fields,custom_values:tables.custom_values,listings:[...listings,...soldListings].map(h=>({id:h.id,listingKey:h.listingKey,name:h.name,city:h.city,price:h.price,status:h.status,assumable:h.assumable,assumableRate:h.assumableRate,loanBalance:h.loanBalance,downPayment:h.downPayment,rentalRestrictions:h.rentalRestrictions,loanTermMonths:h.loanTermMonths,loanType:h.loanType})),users:this.getUsers(),leads:this.getLeads(),savedSearches:this.getSavedSearches(),alerts:this.getAlerts(),favorites:this.getFavorites(),events:this.getEvents()};},
-    resetDemoData(){try{Object.keys(localStorage).filter(k=>k.startsWith(KEY)).forEach(k=>localStorage.removeItem(k));}catch{}Object.keys(cache).forEach(k=>delete cache[k]);DataPorts.db.reset();rebuild();}
+    resetDemoData(){if(remote.on)fetch('/api/reset',{method:'POST',credentials:'include'}).then(()=>location.reload());}
+  });
+  DataPorts.ready.then(connected=>{
+    if(!connected||!DataPorts.remoteState)return;
+    const s=DataPorts.remoteState;
+    remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];remote.session=s.user||null;
+    rebuild();
   });
 })();
