@@ -97,7 +97,8 @@
   const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,session:null};
   const mutate=(action,payload)=>fetch('/api/mutate',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({action,payload})}).then(async r=>{const data=await r.json().catch(()=>({ok:false,error:'The database did not answer.'}));return (!r.ok||data.ok===false)?{ok:false,error:data.error||'The database rejected that edit.'}:data;}).catch(()=>offline);
   async function pull(){const ok=await DataPorts.connect();if(!ok||!DataPorts.remoteState)return offline;const s=DataPorts.remoteState;remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];if(s.user)remote.session=s.user;rebuild();return {ok:true};}
-  const dayKey=d=>d.toISOString().slice(0,10);
+  const localDay=value=>{const d=value instanceof Date?value:new Date(value);if(Number.isNaN(d.getTime()))return '';return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  const clientId=()=>{const m=document.cookie.match(/(?:^|; )sos_client=([^;]+)/);return m?decodeURIComponent(m[1]):'';};
   Object.assign(window.MockAPI,{
     LEAD_STATUSES,DEMO_USERS,
     customFields(){return DataPorts.db.fields.list();},
@@ -142,12 +143,13 @@
     isEdited(id){const h=homeById(id);return h?DataPorts.db.assumable.isEdited(h.listingKey):false;},
     getLeads(){return remote.on?remote.leads:[];},
     setLeadStatus(id,status){if(!remote.on)return;remote.leads.forEach(l=>{if(String(l.id)===String(id))l.status=status});mutate('lead.status',{id,status});},
-    track(type,data={}){if(!remote.on)return;const row={type,...data,at:new Date().toISOString()};remote.events.push(row);mutate('event.add',{type,data,at:row.at});},
+    localDay,
+    track(type,data={}){if(!remote.on)return;const row={type,...data,clientId:data.clientId||clientId(),at:new Date().toISOString()};remote.events.push(row);const {type:eventType,at,...rest}=row;mutate('event.add',{type:eventType,data:rest,at});},
     getEvents(){return remote.on?remote.events:[];},
     getAnalytics(days=30){const today=new Date(),out=[],real=this.getEvents(),realBy={},leadsBy={};
-      real.forEach(e=>{const k=String(e.at).slice(0,10);const bucket=realBy[k]=realBy[k]||{views:0,searches:0,saves:0,visitors:0};if(e.type==='view'){bucket.views++;bucket.visitors++;}if(e.type==='search')bucket.searches++;if(e.type==='favorite')bucket.saves++;});
-      this.getLeads().forEach(l=>{const k=String(l.submittedAt).slice(0,10);leadsBy[k]=(leadsBy[k]||0)+1;});
-      for(let i=days*2-1;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()-i),k=dayKey(d),r=realBy[k]||{views:0,searches:0,saves:0,visitors:0};out.push({date:k,visitors:r.visitors,views:r.views,searches:r.searches,saves:r.saves,leads:leadsBy[k]||0});}
+      real.forEach(e=>{const k=localDay(e.at);if(!k)return;const bucket=realBy[k]=realBy[k]||{views:0,searches:0,saves:0,people:new Set()};if(e.type==='view'){bucket.views++;bucket.people.add(e.clientId||('view-'+e.at));}if(e.type==='search')bucket.searches++;if(e.type==='favorite')bucket.saves++;});
+      this.getLeads().forEach(l=>{const k=localDay(l.submittedAt);if(k)leadsBy[k]=(leadsBy[k]||0)+1;});
+      for(let i=days*2-1;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()-i),k=localDay(d),r=realBy[k]||{views:0,searches:0,saves:0,people:new Set()};out.push({date:k,visitors:r.people.size,views:r.views,searches:r.searches,saves:r.saves,leads:leadsBy[k]||0});}
       return out;},
     exportAll(){const tables=DataPorts.db.tables();return {trestle_properties:DataPorts.catalog().map(h=>({listingKey:h.listingKey,reference:h.reference,name:h.name,city:h.city,price:h.price,beds:h.beds,baths:h.baths,sqft:h.sqft,status:h.status,address:h.address})),assumable_data:tables.assumable_data,custom_categories:tables.custom_categories,custom_fields:tables.custom_fields,custom_values:tables.custom_values,listings:[...listings,...soldListings].map(h=>({id:h.id,listingKey:h.listingKey,name:h.name,city:h.city,price:h.price,status:h.status,assumable:h.assumable,assumableRate:h.assumableRate,loanBalance:h.loanBalance,downPayment:h.downPayment,rentalRestrictions:h.rentalRestrictions,loanTermMonths:h.loanTermMonths,loanType:h.loanType})),users:this.getUsers(),leads:this.getLeads(),savedSearches:this.getSavedSearches(),alerts:this.getAlerts(),favorites:this.getFavorites(),events:this.getEvents()};},
     resetDemoData(){if(remote.on)fetch('/api/reset',{method:'POST',credentials:'include'}).then(()=>location.reload());}

@@ -191,7 +191,7 @@
     $('#searchOpen').addEventListener('click',()=>window.RealEstateStudio?.open('search'));
     $('#listingGrid').addEventListener('click',async e=>{
       const favorite=e.target.closest('[data-favorite]');
-      if(favorite){const id=Number(favorite.dataset.favorite),favorites=MockAPI.toggleFavorite(id);favorite.classList.toggle('is-saved',favorites.includes(id));favorite.textContent=favorites.includes(id)?'♥':'♡';favorite.setAttribute('aria-pressed',String(favorites.includes(id)));favorite.setAttribute('aria-label',favorites.includes(id)?'Remove from favorites':'Add to favorites');toast(DataPorts.mode==='database'?(favorites.includes(id)?'Saved.':'Removed from saved homes.'):'The database is not connected.');return;}
+      if(favorite){const id=Number(favorite.dataset.favorite),favorites=MockAPI.toggleFavorite(id);favorite.classList.toggle('is-saved',favorites.includes(id));favorite.textContent=favorites.includes(id)?'♥':'♡';favorite.setAttribute('aria-pressed',String(favorites.includes(id)));favorite.setAttribute('aria-label',favorites.includes(id)?'Remove from favorites':'Add to favorites');if(favorites.includes(id))MockAPI.track('favorite',{id});toast(DataPorts.mode==='database'?(favorites.includes(id)?'Saved.':'Removed from saved homes.'):'The database is not connected.');return;}
       const button=e.target.closest('[data-open-listing]');if(button){const listing=await MockAPI.getListing(button.dataset.openListing);if(listing)listingModal(listing);}
     });
     $$('.area-card').forEach(card=>card.addEventListener('click',()=>window.RealEstateStudio?.open('community-detail',{city:card.dataset.area})));
