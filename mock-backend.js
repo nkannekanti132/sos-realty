@@ -99,7 +99,7 @@
   const TASK_FREQUENCIES=['One-time','Daily','Weekly','Semi-monthly','Monthly','Quarterly','Yearly'];
   const TASK_STATUSES=['Not started','In progress','Waiting','Done'];
   const TASK_CATEGORIES=['Personal Tasks','Loans','Homes','Both Home and Loan','Personal Finances','Other'];
-  const TASK_OWNERS=['Janardhan Vangala','Neethe Vangala'];
+  const TASK_OWNERS=['Janardhan Vangala','Neetha Vangala'];
   const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,tasks:[],session:null};
   const mutate=(action,payload)=>fetch('/api/mutate',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({action,payload})}).then(async r=>{const data=await r.json().catch(()=>({ok:false,error:'The database did not answer.'}));return (!r.ok||data.ok===false)?{ok:false,error:data.error||'The database rejected that edit.'}:data;}).catch(()=>offline);
   async function pull(){const ok=await DataPorts.connect();if(!ok||!DataPorts.remoteState)return offline;const s=DataPorts.remoteState;remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];remote.tasks=s.tasks||[];if(s.user)remote.session=s.user;rebuild();return {ok:true};}

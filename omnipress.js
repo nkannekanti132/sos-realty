@@ -468,19 +468,20 @@
   function taskLists(){const tasks=MockAPI.getTasks(),users=MockAPI.getUsers(),uniq=a=>[...new Set(a.map(x=>String(x||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     return {owners:uniq([...MockAPI.TASK_OWNERS,...users.filter(u=>u.role==='admin').map(u=>u.name),...tasks.map(t=>t.owner)]),clients:uniq([...users.filter(u=>u.role!=='admin').map(u=>u.name),...MockAPI.getLeads().map(l=>l.name),...tasks.map(t=>t.client)]),cats:MockAPI.TASK_CATEGORIES};}
   function taskForm(t){const isNew=!t.id,L=taskLists(),opt=(list,v)=>list.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
-    return `<tr class="adm-edit-row"><td colspan="9"><form class="adm-edit" id="admTaskForm" data-id="${esc(t.id||'')}"><fieldset><legend>${isNew?'New task':'Edit task'}</legend>
+    return `<tr class="adm-edit-row"><td colspan="10"><form class="adm-edit" id="admTaskForm" data-id="${esc(t.id||'')}"><fieldset><legend>${isNew?'New task':'Edit task'}</legend>
       <div class="adm-edit-grid tk-grid">${field('task','Task',`<input required maxlength="500" value="${esc(t.task||'')}" placeholder="What needs to be done?">`)}
-        ${field('owner','Owner',`<input list="tkOwners" value="${esc(t.owner||'')}" placeholder="Who is doing it">`)}
+        ${field('owner','Owner',`<select><option value="">—</option>${opt(L.owners,t.owner||'')}</select>`)}
+        ${field('subOwner','Sub-Owner',`<input maxlength="500" value="${esc(t.subOwner||'')}" placeholder="Type a name">`)}
         ${field('priority','Priority (1 = most urgent)',`<select>${opt(MockAPI.TASK_PRIORITIES,MockAPI.TASK_PRIORITIES.includes(t.priority)?t.priority:'3')}</select>`)}
         ${field('frequency','Frequency',`<select>${opt(MockAPI.TASK_FREQUENCIES,t.frequency||'One-time')}</select>`)}
         ${field('status','Status',`<select>${opt(MockAPI.TASK_STATUSES,t.status||'Not started')}</select>`)}
         ${field('dueDate','Due date',`<input type="date" value="${esc(t.dueDate||'')}">`)}
         ${field('category','Category',`<select><option value="">—</option>${opt(L.cats,t.category||'')}</select>`)}
         ${field('client','Client',`<input list="tkClients" value="${esc(t.client||'')}" placeholder="Pick or type">`)}</div>
-      <datalist id="tkOwners">${L.owners.map(o=>`<option value="${esc(o)}">`).join('')}</datalist><datalist id="tkClients">${L.clients.map(o=>`<option value="${esc(o)}">`).join('')}</datalist></fieldset>
+<datalist id="tkClients">${L.clients.map(o=>`<option value="${esc(o)}">`).join('')}</datalist></fieldset>
       <div class="adm-edit-actions"><button class="studio-btn" type="submit">${isNew?'Add task':'Save task'}</button><button type="button" class="studio-btn secondary" data-action="adm-task-edit" data-id="">Cancel</button>${isNew?'':`<button type="button" class="adm-link danger" data-action="adm-task-del" data-id="${esc(t.id)}">Delete task</button>`}</div></form></td></tr>`;}
   function admTasks(){const all=MockAPI.getTasks(),q=A.taskQ.toLowerCase(),L=taskLists(),me=MockAPI.currentUser();
-    const ls=all.filter(t=>(!q||[t.task,t.owner,t.category,t.client].join(' ').toLowerCase().includes(q))&&(A.taskSt===''||(A.taskSt==='open'?t.status!=='Done':A.taskSt==='overdue'?taskOverdue(t):t.status===A.taskSt))&&(!A.taskPri||t.priority===A.taskPri)&&(!A.taskOwner||t.owner===A.taskOwner)&&(!A.taskCat||t.category===A.taskCat))
+    const ls=all.filter(t=>(!q||[t.task,t.owner,t.subOwner,t.category,t.client].join(' ').toLowerCase().includes(q))&&(A.taskSt===''||(A.taskSt==='open'?t.status!=='Done':A.taskSt==='overdue'?taskOverdue(t):t.status===A.taskSt))&&(!A.taskPri||t.priority===A.taskPri)&&(!A.taskOwner||t.owner===A.taskOwner)&&(!A.taskCat||t.category===A.taskCat))
       .sort((a,b)=>(a.status==='Done')-(b.status==='Done')||(a.dueDate||'9999').localeCompare(b.dueDate||'9999')||MockAPI.TASK_PRIORITIES.indexOf(a.priority)-MockAPI.TASK_PRIORITIES.indexOf(b.priority));
     const sel=(name,label,list,extra='')=>`<select name="${name}" aria-label="${label}">${extra}${list.map(([v,l])=>`<option value="${esc(v)}" ${A[name]===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
     const counts=[['open','Open',all.filter(t=>t.status!=='Done').length],['overdue','Overdue',all.filter(taskOverdue).length],...MockAPI.TASK_STATUSES.map(s=>[s,s,all.filter(t=>t.status===s).length])];
@@ -492,11 +493,11 @@
       ${sel('taskCat','Category',[['','Any category'],...L.cats.map(s=>[s,s])])}
       <button type="button" class="adm-mini" data-action="adm-task-edit" data-id="new">+ Add task</button><button type="button" class="adm-link" data-action="adm-export" data-coll="tasks">Export CSV</button></form>
       <div class="adm-pipeline">${counts.map(([v,l,n])=>`<button data-action="adm-task-filter" data-st="${A.taskSt===v?'':esc(v)}" class="${A.taskSt===v?'on':''}${v==='overdue'&&n?' late':''}"><b>${n}</b>${esc(l)}</button>`).join('')}</div>
-      <div class="adm-table-wrap"><table class="adm-table tk-table"><thead><tr><th>Task</th><th>Owner</th><th>Priority</th><th>Frequency</th><th>Status</th><th>Due date</th><th>Category</th><th>Client</th><th></th></tr></thead><tbody>
+      <div class="adm-table-wrap"><table class="adm-table tk-table"><thead><tr><th>Task</th><th>Owner</th><th>Sub-Owner</th><th>Priority</th><th>Frequency</th><th>Status</th><th>Due date</th><th>Category</th><th>Client</th><th></th></tr></thead><tbody>
       ${editing?taskForm(editing):''}
-      ${ls.map(t=>{const open=A.taskEdit===t.id;return `<tr class="${open?'is-editing':''}${t.status==='Done'?' tk-done':''}"><td class="tk-name"><b>${esc(t.task)}</b></td><td>${esc(t.owner||'—')}</td><td><span class="tk-pri pri-${slug(t.priority)}">${esc(t.priority)}</span></td><td>${esc(t.frequency)}</td>
+      ${ls.map(t=>{const open=A.taskEdit===t.id;return `<tr class="${open?'is-editing':''}${t.status==='Done'?' tk-done':''}"><td class="tk-name"><b>${esc(t.task)}</b></td><td>${esc(t.owner||'—')}</td><td>${esc(t.subOwner||'—')}</td><td><span class="tk-pri pri-${slug(t.priority)}">${esc(t.priority)}</span></td><td>${esc(t.frequency)}</td>
         <td><select class="adm-lead-st tk-st-${slug(t.status)}" data-task-status="${esc(t.id)}" aria-label="Status for ${esc(t.task)}">${MockAPI.TASK_STATUSES.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}</select></td>
-        <td>${taskDue(t)}</td><td>${esc(t.category||'—')}</td><td>${esc(t.client||'—')}</td><td class="adm-edit-col"><button type="button" class="adm-mini" data-action="adm-task-edit" data-id="${open?'':esc(t.id)}">${open?'Close':'Edit'}</button></td></tr>${open?taskForm(t):''}`;}).join('')||(editing?'':`<tr><td colspan="9" class="adm-empty">${all.length?'No tasks match these filters.':'No tasks yet. Use Add task to create the first one.'}</td></tr>`)}
+        <td>${taskDue(t)}</td><td>${esc(t.category||'—')}</td><td>${esc(t.client||'—')}</td><td class="adm-edit-col"><button type="button" class="adm-mini" data-action="adm-task-edit" data-id="${open?'':esc(t.id)}">${open?'Close':'Edit'}</button></td></tr>${open?taskForm(t):''}`;}).join('')||(editing?'':`<tr><td colspan="10" class="adm-empty">${all.length?'No tasks match these filters.':'No tasks yet. Use Add task to create the first one.'}</td></tr>`)}
       </tbody></table></div><p class="adm-foot">${ls.length} of ${all.length} tasks · only admins can see or change this list.</p>`;}
   function admData(){const data=MockAPI.exportAll(),c=data[A.coll]||[];
     return `<div class="adm-db"><aside>${Object.entries(data).map(([k,v])=>`<button data-action="adm-coll" data-coll="${k}" class="${A.coll===k?'on':''}">${ICON.db}<span>${k}</span><b>${v.length}</b></button>`).join('')}<button class="adm-link danger" data-action="adm-reset-all">Reset database</button></aside>

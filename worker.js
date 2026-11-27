@@ -32,7 +32,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, payload TEXT, created_at TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY, task TEXT NOT NULL, owner TEXT, priority TEXT NOT NULL DEFAULT '3',
+    id TEXT PRIMARY KEY, task TEXT NOT NULL, owner TEXT, sub_owner TEXT, priority TEXT NOT NULL DEFAULT '3',
     frequency TEXT NOT NULL DEFAULT 'One-time', status TEXT NOT NULL DEFAULT 'Not started', due_date TEXT,
     category TEXT, client TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`
 ];
@@ -88,10 +88,10 @@ const TASK_FREQUENCIES = ['One-time', 'Daily', 'Weekly', 'Semi-monthly', 'Monthl
 const TASK_STATUSES = ['Not started', 'In progress', 'Waiting', 'Done'];
 const TASK_CATEGORIES = ['Personal Tasks', 'Loans', 'Homes', 'Both Home and Loan', 'Personal Finances', 'Other'];
 const TASKS = [
-  ['T-1001','Call Priya about Saturday tour','Janardhan Vangala','1','One-time','Not started','2026-11-28','Homes','Priya Natarajan'],
-  ['T-1002','Request VA assumption package from servicer','Janardhan Vangala','1','One-time','In progress','2026-12-02','Both Home and Loan','Marcus Reed'],
-  ['T-1003','Review monthly budget','Neethe Vangala','3','Monthly','Not started','2026-12-01','Personal Finances',''],
-  ['T-1004','Check new assumable loans in the feed','Janardhan Vangala','2','Weekly','Not started','2026-11-30','Loans','']
+  ['T-1001','Call Priya about Saturday tour','Janardhan Vangala','','1','One-time','Not started','2026-11-28','Homes','Priya Natarajan'],
+  ['T-1002','Request VA assumption package from servicer','Janardhan Vangala','Loan officer','1','One-time','In progress','2026-12-02','Both Home and Loan','Marcus Reed'],
+  ['T-1003','Review monthly budget','Neetha Vangala','Janardhan Vangala','3','Monthly','Not started','2026-12-01','Personal Finances',''],
+  ['T-1004','Check new assumable loans in the feed','Janardhan Vangala','','2','Weekly','Not started','2026-11-30','Loans','']
 ];
 
 function json(data, status = 200, cookies = []) {
@@ -129,8 +129,17 @@ function publicUser(row) {
   if (!row) return null;
   return { id: row.id, name: row.name, email: row.email, role: row.role, phone: row.phone || '', createdAt: row.created_at };
 }
+// Columns added after a table first shipped. CREATE TABLE IF NOT EXISTS does not add them to an existing table.
+let migrated = false;
+async function migrate(env) {
+  if (migrated) return;
+  const cols = await env.DB.prepare('PRAGMA table_info(tasks)').all();
+  if (!cols.results.some(c => c.name === 'sub_owner')) await env.DB.prepare('ALTER TABLE tasks ADD COLUMN sub_owner TEXT').run();
+  migrated = true;
+}
 async function ensure(env) {
   await env.DB.batch(SCHEMA.map(sql => env.DB.prepare(sql)));
+  await migrate(env);
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first();
   if (count && count.n) return;
   const stmts = [];
@@ -143,7 +152,7 @@ async function ensure(env) {
     stmts.push(env.DB.prepare('INSERT INTO users (id, name, email, password_hash, role, phone, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(row[0], row[1], row[2], hash, row[4], row[5], row[6]));
   }
   const seeded = new Date().toISOString();
-  for (const row of TASKS) stmts.push(env.DB.prepare('INSERT INTO tasks (id, task, owner, priority, frequency, status, due_date, category, client, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(...row, seeded, seeded));
+  for (const row of TASKS) stmts.push(env.DB.prepare('INSERT INTO tasks (id, task, owner, sub_owner, priority, frequency, status, due_date, category, client, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(...row, seeded, seeded));
   for (const row of LEADS) stmts.push(env.DB.prepare("INSERT INTO leads (id, name, email, phone, intent, source, home, message, status, submitted_at, sample) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, 1)").bind(...row));
   if (stmts.length) await env.DB.batch(stmts);
 }
@@ -193,7 +202,7 @@ async function readState(env, request) {
   };
 }
 function taskOut(r) {
-  return { id: r.id, task: r.task, owner: r.owner || '', priority: r.priority, frequency: r.frequency, status: r.status, dueDate: r.due_date || '', category: r.category || '', client: r.client || '', createdAt: r.created_at, updatedAt: r.updated_at };
+  return { id: r.id, task: r.task, owner: r.owner || '', subOwner: r.sub_owner || '', priority: r.priority, frequency: r.frequency, status: r.status, dueDate: r.due_date || '', category: r.category || '', client: r.client || '', createdAt: r.created_at, updatedAt: r.updated_at };
 }
 function cleanTask(input) {
   const text = v => String(v == null ? '' : v).trim().slice(0, 500);
@@ -202,6 +211,7 @@ function cleanTask(input) {
   return {
     task: text(input.task),
     owner: text(input.owner),
+    subOwner: text(input.subOwner),
     priority: pick(String(input.priority == null ? '' : input.priority), TASK_PRIORITIES, '3'),
     frequency: pick(input.frequency, TASK_FREQUENCIES, 'One-time'),
     status: pick(input.status, TASK_STATUSES, 'Not started'),
@@ -342,7 +352,7 @@ async function mutate(env, request, body) {
     if (!t.task) return json({ ok: false, error: 'A task needs a description.' }, 400);
     const now = new Date().toISOString();
     const id = payload.id ? String(payload.id) : 'T-' + crypto.randomUUID();
-    await env.DB.prepare('INSERT INTO tasks (id, task, owner, priority, frequency, status, due_date, category, client, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET task = excluded.task, owner = excluded.owner, priority = excluded.priority, frequency = excluded.frequency, status = excluded.status, due_date = excluded.due_date, category = excluded.category, client = excluded.client, updated_at = excluded.updated_at').bind(id, t.task, t.owner, t.priority, t.frequency, t.status, t.dueDate || null, t.category, t.client, now, now).run();
+    await env.DB.prepare('INSERT INTO tasks (id, task, owner, sub_owner, priority, frequency, status, due_date, category, client, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET task = excluded.task, owner = excluded.owner, sub_owner = excluded.sub_owner, priority = excluded.priority, frequency = excluded.frequency, status = excluded.status, due_date = excluded.due_date, category = excluded.category, client = excluded.client, updated_at = excluded.updated_at').bind(id, t.task, t.owner, t.subOwner, t.priority, t.frequency, t.status, t.dueDate || null, t.category, t.client, now, now).run();
     const row = await env.DB.prepare('SELECT * FROM tasks WHERE id = ?').bind(id).first();
     return json({ ok: true, task: taskOut(row) });
   }
