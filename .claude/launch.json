@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sos-realty",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "wrangler", "dev", "--local", "--port", "8787"],
+      "port": 8787
+    }
+  ]
+}

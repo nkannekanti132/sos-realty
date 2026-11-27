@@ -42,3 +42,6 @@ Janardhan Vangala / SOS Realty Group LLC
 - Each community name, description and CTA is accessible live HTML below its picture; no text or CTA overlays on pictures.
 - Cards open the corresponding community guide in the existing client-side frontend.
 - Removed the duplicated lower community-card grid so the page presents one clear set of neighborhood choices.
+
+Test Add for ReadMe file
+

@@ -81,3 +81,17 @@ CREATE TABLE IF NOT EXISTS events (
   payload TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tasks (
+  id TEXT PRIMARY KEY,
+  task TEXT NOT NULL,
+  owner TEXT,
+  sub_owner TEXT,
+  priority TEXT NOT NULL DEFAULT '3',
+  frequency TEXT NOT NULL DEFAULT 'One-time',
+  status TEXT NOT NULL DEFAULT 'Not started',
+  due_date TEXT,
+  category TEXT,
+  client TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
