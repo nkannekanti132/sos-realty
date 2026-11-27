@@ -390,7 +390,7 @@
       <div class="studio-section-title"><h2>Lowest assumable rates <em>for you.</em></h2><button data-action="assumable-report">All assumable homes ↗</button></div><div class="hf-grid acct-grid">${cards(picks)}</div></section>`;}
 
   /* ---------- Admin dashboard ---------- */
-  const A=state.adm={tab:'overview',range:30,q:'',city:'',assum:'',loan:'',ver:'',status:'',edit:null,leadQ:'',leadSt:'',leadSrc:'',userQ:'',userRole:'',coll:'assumable_data',taskQ:'',taskSt:'open',taskPri:'',taskOwner:'',taskCat:'',taskEdit:null};
+  const A=state.adm={tab:'overview',range:30,q:'',city:'',assum:'',loan:'',ver:'',status:'',edit:null,leadQ:'',leadSt:'',leadSrc:'',userQ:'',userRole:'',coll:'assumable_data',taskQ:'',taskSt:'open',taskPri:'',taskOwner:'',taskCat:'',taskEdit:null,taskView:(()=>{try{return localStorage.getItem('sos-task-view')==='group'?'group':'full';}catch{return 'full';}})(),taskShut:new Set()};
   const fmtN=n=>Number(n).toLocaleString('en-US');
   const delta=(cur,prev)=>{if(!prev)return '';const d=(cur-prev)/prev*100;return `<em class="${d>=0?'up':'down'}">${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</em>`;};
   function lineChart(rows,keys){const W=760,H=230,P=[18,14,26,40],max=Math.max(1,...rows.flatMap(r=>keys.map(([k])=>r[k])))*1.12,x=i=>P[3]+i*(W-P[1]-P[3])/Math.max(1,rows.length-1),y=v=>P[0]+(H-P[0]-P[2])*(1-v/max);
@@ -480,24 +480,31 @@
         ${field('client','Client',`<input list="tkClients" value="${esc(t.client||'')}" placeholder="Pick or type">`)}</div>
 <datalist id="tkClients">${L.clients.map(o=>`<option value="${esc(o)}">`).join('')}</datalist></fieldset>
       <div class="adm-edit-actions"><button class="studio-btn" type="submit">${isNew?'Add task':'Save task'}</button><button type="button" class="studio-btn secondary" data-action="adm-task-edit" data-id="">Cancel</button>${isNew?'':`<button type="button" class="adm-link danger" data-action="adm-task-del" data-id="${esc(t.id)}">Delete task</button>`}</div></form></td></tr>`;}
+  /* Group by category: one header row per category in the fixed category order, then tasks with no or unknown category. Empty groups are left out. */
+  function taskGroups(ls,row){const order=[...MockAPI.TASK_CATEGORIES],groups=new Map(order.map(c=>[c,[]])),none=[];
+    ls.forEach(t=>{if(groups.has(t.category))groups.get(t.category).push(t);else none.push(t);});
+    const list=[...groups.entries(),['No category',none]].filter(([,ts])=>ts.length);
+    return list.map(([name,ts])=>{const shut=A.taskShut.has(name),late=ts.filter(taskOverdue).length,open=ts.filter(t=>t.status!=='Done').length;
+      return `<tr class="tk-group${shut?' shut':''}"><td colspan="10"><button type="button" data-action="adm-task-group" data-group="${esc(name)}" aria-expanded="${!shut}"><span class="tk-caret" aria-hidden="true">▾</span><b>${esc(name)}</b><small>${ts.length} ${ts.length===1?'task':'tasks'} · ${open} open${late?` · <em>${late} overdue</em>`:''}</small></button></td></tr>${shut?'':ts.map(row).join('')}`;}).join('');}
   function admTasks(){const all=MockAPI.getTasks(),q=A.taskQ.toLowerCase(),L=taskLists(),me=MockAPI.currentUser();
     const ls=all.filter(t=>(!q||[t.task,t.owner,t.subOwner,t.category,t.client].join(' ').toLowerCase().includes(q))&&(A.taskSt===''||(A.taskSt==='open'?t.status!=='Done':A.taskSt==='overdue'?taskOverdue(t):t.status===A.taskSt))&&(!A.taskPri||t.priority===A.taskPri)&&(!A.taskOwner||t.owner===A.taskOwner)&&(!A.taskCat||t.category===A.taskCat))
       .sort((a,b)=>(a.status==='Done')-(b.status==='Done')||(a.dueDate||'9999').localeCompare(b.dueDate||'9999')||MockAPI.TASK_PRIORITIES.indexOf(a.priority)-MockAPI.TASK_PRIORITIES.indexOf(b.priority));
     const sel=(name,label,list,extra='')=>`<select name="${name}" aria-label="${label}">${extra}${list.map(([v,l])=>`<option value="${esc(v)}" ${A[name]===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
     const counts=[['open','Open',all.filter(t=>t.status!=='Done').length],['overdue','Overdue',all.filter(taskOverdue).length],...MockAPI.TASK_STATUSES.map(s=>[s,s,all.filter(t=>t.status===s).length])];
     const editing=A.taskEdit==='new'?{owner:me?.name||'',priority:'3',frequency:'One-time',status:'Not started'}:null;
+    const taskRow=t=>{const open=A.taskEdit===t.id;return `<tr class="${open?'is-editing':''}${t.status==='Done'?' tk-done':''}"><td class="tk-name"><b>${esc(t.task)}</b></td><td>${esc(t.owner||'—')}</td><td>${esc(t.subOwner||'—')}</td><td><span class="tk-pri pri-${slug(t.priority)}">${esc(t.priority)}</span></td><td>${esc(t.frequency)}</td>
+        <td><select class="adm-lead-st tk-st-${slug(t.status)}" data-task-status="${esc(t.id)}" aria-label="Status for ${esc(t.task)}">${MockAPI.TASK_STATUSES.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}</select></td>
+        <td>${taskDue(t)}</td><td>${esc(t.category||'—')}</td><td>${esc(t.client||'—')}</td><td class="adm-edit-col"><button type="button" class="adm-mini" data-action="adm-task-edit" data-id="${open?'':esc(t.id)}">${open?'Close':'Edit'}</button></td></tr>${open?taskForm(t):''}`;};
     return `<form class="adm-filters" id="admTaskFilters"><label class="adm-search"><input name="taskQ" value="${esc(A.taskQ)}" placeholder="Search task, owner, client…" aria-label="Search tasks"></label>
       ${sel('taskSt','Status',[['','Any status'],['open','Open (not done)'],['overdue','Overdue'],...MockAPI.TASK_STATUSES.map(s=>[s,s])])}
       ${sel('taskPri','Priority',[['','Any priority'],...MockAPI.TASK_PRIORITIES.map(s=>[s,'Priority '+s])])}
       ${sel('taskOwner','Owner',[['','Any owner'],...L.owners.map(s=>[s,s])])}
       ${sel('taskCat','Category',[['','Any category'],...L.cats.map(s=>[s,s])])}
-      <button type="button" class="adm-mini" data-action="adm-task-edit" data-id="new">+ Add task</button><button type="button" class="adm-link" data-action="adm-export" data-coll="tasks">Export CSV</button></form>
+      <div class="adm-range tk-view" role="group" aria-label="Task view">${[['full','Full view'],['group','Group by category']].map(([v,l])=>`<button type="button" data-action="adm-task-view" data-view="${v}" class="${A.taskView===v?'on':''}" aria-pressed="${A.taskView===v}">${l}</button>`).join('')}</div>${A.taskView==='group'?`<span class="tk-fold"><button type="button" class="adm-link" data-action="adm-task-fold" data-fold="shut">Collapse all</button><button type="button" class="adm-link" data-action="adm-task-fold" data-fold="open">Expand all</button></span>`:''}<button type="button" class="adm-mini" data-action="adm-task-edit" data-id="new">+ Add task</button><button type="button" class="adm-link" data-action="adm-export" data-coll="tasks">Export CSV</button></form>
       <div class="adm-pipeline">${counts.map(([v,l,n])=>`<button data-action="adm-task-filter" data-st="${A.taskSt===v?'':esc(v)}" class="${A.taskSt===v?'on':''}${v==='overdue'&&n?' late':''}"><b>${n}</b>${esc(l)}</button>`).join('')}</div>
       <div class="adm-table-wrap"><table class="adm-table tk-table"><thead><tr><th>Task</th><th>Owner</th><th>Sub-Owner</th><th>Priority</th><th>Frequency</th><th>Status</th><th>Due date</th><th>Category</th><th>Client</th><th></th></tr></thead><tbody>
       ${editing?taskForm(editing):''}
-      ${ls.map(t=>{const open=A.taskEdit===t.id;return `<tr class="${open?'is-editing':''}${t.status==='Done'?' tk-done':''}"><td class="tk-name"><b>${esc(t.task)}</b></td><td>${esc(t.owner||'—')}</td><td>${esc(t.subOwner||'—')}</td><td><span class="tk-pri pri-${slug(t.priority)}">${esc(t.priority)}</span></td><td>${esc(t.frequency)}</td>
-        <td><select class="adm-lead-st tk-st-${slug(t.status)}" data-task-status="${esc(t.id)}" aria-label="Status for ${esc(t.task)}">${MockAPI.TASK_STATUSES.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}</select></td>
-        <td>${taskDue(t)}</td><td>${esc(t.category||'—')}</td><td>${esc(t.client||'—')}</td><td class="adm-edit-col"><button type="button" class="adm-mini" data-action="adm-task-edit" data-id="${open?'':esc(t.id)}">${open?'Close':'Edit'}</button></td></tr>${open?taskForm(t):''}`;}).join('')||(editing?'':`<tr><td colspan="10" class="adm-empty">${all.length?'No tasks match these filters.':'No tasks yet. Use Add task to create the first one.'}</td></tr>`)}
+      ${(A.taskView==='group'?taskGroups(ls,taskRow):ls.map(taskRow).join(''))||(editing?'':`<tr><td colspan="10" class="adm-empty">${all.length?'No tasks match these filters.':'No tasks yet. Use Add task to create the first one.'}</td></tr>`)}
       </tbody></table></div><p class="adm-foot">${ls.length} of ${all.length} tasks · only admins can see or change this list.</p>`;}
   function admData(){const data=MockAPI.exportAll(),c=data[A.coll]||[];
     return `<div class="adm-db"><aside>${Object.entries(data).map(([k,v])=>`<button data-action="adm-coll" data-coll="${k}" class="${A.coll===k?'on':''}">${ICON.db}<span>${k}</span><b>${v.length}</b></button>`).join('')}<button class="adm-link danger" data-action="adm-reset-all">Reset database</button></aside>
@@ -570,6 +577,9 @@
     if(action==='adm-quick-verify'){const h=MockAPI.listings.find(x=>x.id===Number(t.dataset.id));const res=await MockAPI.updateListing(h.id,{verified:[...new Set([...(h.verified||[]),'Loan verified'])]});paint();feedback(res&&res.ok===false?res.error:`${h.name} marked as loan verified.`);return true;}
     if(action==='adm-reset-listing'){const res=await MockAPI.resetListing(Number(t.dataset.id));A.edit=null;paintAdm();feedback(res&&res.ok===false?res.error:'Listing reverted to its original data.');return true;}
     if(action==='adm-lead-filter'){A.leadSt=t.dataset.st;paintAdm();return true;}
+    if(action==='adm-task-view'){A.taskView=t.dataset.view==='group'?'group':'full';try{localStorage.setItem('sos-task-view',A.taskView);}catch{}paintAdm();return true;}
+    if(action==='adm-task-fold'){A.taskShut=t.dataset.fold==='shut'?new Set([...MockAPI.TASK_CATEGORIES,'No category']):new Set();paintAdm();return true;}
+    if(action==='adm-task-group'){const g=t.dataset.group;if(A.taskShut.has(g))A.taskShut.delete(g);else A.taskShut.add(g);paintAdm();return true;}
     if(action==='adm-task-filter'){A.taskSt=t.dataset.st;paintAdm();return true;}
     if(action==='adm-task-edit'){A.taskEdit=t.dataset.id||null;paintAdm();if(A.taskEdit){const f=$('#admTaskForm');f?.scrollIntoView({block:'nearest',behavior:'smooth'});if(A.taskEdit==='new')f?.elements.task.focus();}return true;}
     if(action==='adm-task-del'){const task=MockAPI.getTasks().find(x=>x.id===t.dataset.id);if(task&&confirm(`Delete the task "${task.task}"?`)){const res=await MockAPI.deleteTask(task.id);A.taskEdit=null;paintAdm();feedback(res&&res.ok===false?res.error:'Task deleted.');}return true;}
