@@ -13,5 +13,14 @@
       "database_name": "sos-realty",
       "database_id": "4159729c-fd52-4742-9101-03ad6431b3c6"
     }
-  ]
+  ],
+  // Branch preview builds use the live database too. Edits made while testing a preview change real data.
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_id": "4159729c-fd52-4742-9101-03ad6431b3c6"
+      }
+    ]
+  }
 }

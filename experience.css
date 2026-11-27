@@ -921,6 +921,15 @@ em.up{color:#1f7a52}em.down{color:#c03636}
 .tk-st-not-started{background:#eef1f6!important;color:#3d4654!important}.tk-st-in-progress{background:#e6eefb!important;color:#264f8a!important}.tk-st-waiting{background:#efe8fb!important;color:#5a3a92!important}.tk-st-done{background:#e5f3ec!important;color:#1f7a52!important}
 .tk-due{display:grid;gap:1px;font-weight:600;white-space:nowrap}.tk-due small{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .tk-due.late{color:#c03636}.tk-due.today{color:#8a5a00}
+.adm-range.tk-view{flex:none}
+.tk-fold{display:inline-flex;gap:2px}
+.tk-table tr.tk-group td{padding:0;background:#f6f2e8;border-bottom:1px solid #e6e1d5}
+.tk-table tbody tr.tk-group:hover td{background:#f1ebdc}
+.tk-group button{display:flex;align-items:baseline;gap:10px;width:100%;padding:11px 14px;border:0;background:none;text-align:left;font:inherit;color:#0a1830;cursor:pointer}
+.tk-group b{font:700 13px 'DM Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase}
+.tk-group small{display:inline;font-size:12.5px;color:#7a8394}.tk-group em{font-style:normal;font-weight:700;color:#c03636}
+.tk-caret{display:inline-block;width:12px;color:#a8792a;transition:transform .15s}
+.tk-group.shut .tk-caret{transform:rotate(-90deg)}
 .adm-edit-grid.tk-grid{grid-template-columns:repeat(4,1fr)}
 .adm-edit-grid.tk-grid .studio-field:first-child{grid-column:span 2}
 @media(max-width:900px){.adm-edit-grid.tk-grid{grid-template-columns:1fr 1fr}.adm-pipeline{grid-template-columns:repeat(3,1fr)}}
