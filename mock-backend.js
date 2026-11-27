@@ -94,9 +94,13 @@
   const homeById=id=>listings.find(h=>h.id===Number(id))||soldListings.find(h=>h.id===Number(id));
   const users=()=>remote.users||[];
   const publicUser=u=>u?(({password,...rest})=>rest)(u):null;
-  const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,session:null};
+  const TASK_PRIORITIES=['High','Medium','Low'];
+  const TASK_FREQUENCIES=['One-time','Daily','Weekly','Monthly','Quarterly','Yearly'];
+  const TASK_STATUSES=['Not started','In progress','Waiting','Done'];
+  const TASK_CATEGORIES=['Follow-up','Listings','Transaction','Marketing','Showing','Paperwork','Admin'];
+  const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,tasks:[],session:null};
   const mutate=(action,payload)=>fetch('/api/mutate',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({action,payload})}).then(async r=>{const data=await r.json().catch(()=>({ok:false,error:'The database did not answer.'}));return (!r.ok||data.ok===false)?{ok:false,error:data.error||'The database rejected that edit.'}:data;}).catch(()=>offline);
-  async function pull(){const ok=await DataPorts.connect();if(!ok||!DataPorts.remoteState)return offline;const s=DataPorts.remoteState;remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];if(s.user)remote.session=s.user;rebuild();return {ok:true};}
+  async function pull(){const ok=await DataPorts.connect();if(!ok||!DataPorts.remoteState)return offline;const s=DataPorts.remoteState;remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];remote.tasks=s.tasks||[];if(s.user)remote.session=s.user;rebuild();return {ok:true};}
   const localDay=value=>{const d=value instanceof Date?value:new Date(value);if(Number.isNaN(d.getTime()))return '';return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   const clientId=()=>{const m=document.cookie.match(/(?:^|; )sos_client=([^;]+)/);return m?decodeURIComponent(m[1]):'';};
   Object.assign(window.MockAPI,{
@@ -106,9 +110,9 @@
     async createCategory(input){const res=await DataPorts.db.categories.create(input);if(!res||res.ok===false){await pull();return res||offline;}rebuild();return res;},
     async createField(input){const res=await DataPorts.db.fields.create(input);if(!res||res.ok===false){await pull();return res||offline;}rebuild();return res;},
     currentUser(){return remote.on?remote.session:null;},
-    async signIn(email,password){if(!remote.on)return offline;const res=await fetch('/api/auth/sign-in',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});const data=await res.json();if(!data.ok)return data;remote.session=data.user;const state=await (await fetch('/api/state',{credentials:'include'})).json();remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;this.track('sign-in',{role:data.user.role});return data;},
+    async signIn(email,password){if(!remote.on)return offline;const res=await fetch('/api/auth/sign-in',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});const data=await res.json();if(!data.ok)return data;remote.session=data.user;const state=await (await fetch('/api/state',{credentials:'include'})).json();remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;remote.tasks=state.tasks||[];this.track('sign-in',{role:data.user.role});return data;},
     async signUp({name,email,phone,password}){if(!remote.on)return offline;const res=await fetch('/api/auth/sign-up',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({name,email,phone,password})});const data=await res.json();if(!data.ok)return data;remote.users=[...remote.users,data.user];remote.session=data.user;this.track('sign-up',{});return data;},
-    signOut(){if(!remote.on)return;remote.session=null;fetch('/api/auth/sign-out',{method:'POST',credentials:'include'}).then(()=>fetch('/api/state',{credentials:'include'}).then(r=>r.json())).then(state=>{remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;});},
+    signOut(){if(!remote.on)return;remote.session=null;remote.tasks=[];fetch('/api/auth/sign-out',{method:'POST',credentials:'include'}).then(()=>fetch('/api/state',{credentials:'include'}).then(r=>r.json())).then(state=>{remote.favorites=state.favorites;remote.searches=state.savedSearches;remote.alerts=state.alerts;});},
     getUsers(){return users().map(publicUser);},
     async updateUser(id,patch){if(!remote.on)return offline;const all=users();const u=all.find(x=>x.id===Number(id));if(u)Object.assign(u,patch);remote.users=all;const res=await mutate('user.update',{id:Number(id),role:patch.role});if(!res.ok)await pull();return res;},
     async deleteUser(id){if(!remote.on)return offline;remote.users=users().filter(u=>u.id!==Number(id));const res=await mutate('user.delete',{id:Number(id)});if(!res.ok)await pull();return res;},
@@ -142,6 +146,11 @@
     async resetListing(id){const h=homeById(id);if(!h)return {ok:false,error:'That listing is not in the admin list.'};if(!remote.on)return offline;const res=await DataPorts.db.assumable.reset(h.listingKey);if(!res||res.ok===false){await pull();return res||offline;}rebuild();return {ok:true};},
     isEdited(id){const h=homeById(id);return h?DataPorts.db.assumable.isEdited(h.listingKey):false;},
     getLeads(){return remote.on?remote.leads:[];},
+    TASK_PRIORITIES,TASK_FREQUENCIES,TASK_STATUSES,TASK_CATEGORIES,
+    /* Tasks are admin-only. The Worker sends them only to an admin session and rejects edits from anyone else. */
+    getTasks(){return remote.on&&remote.session?.role==='admin'?remote.tasks:[];},
+    async saveTask(task){if(!remote.on)return offline;const res=await mutate('task.save',task);if(!res||res.ok===false){await pull();return res||offline;}const i=remote.tasks.findIndex(t=>t.id===res.task.id);if(i>=0)remote.tasks[i]=res.task;else remote.tasks.push(res.task);return res;},
+    async deleteTask(id){if(!remote.on)return offline;remote.tasks=remote.tasks.filter(t=>t.id!==id);const res=await mutate('task.delete',{id});if(!res||res.ok===false)await pull();return res;},
     setLeadStatus(id,status){if(!remote.on)return;remote.leads.forEach(l=>{if(String(l.id)===String(id))l.status=status});mutate('lead.status',{id,status});},
     localDay,
     track(type,data={}){if(!remote.on)return;const row={type,...data,clientId:data.clientId||clientId(),at:new Date().toISOString()};remote.events.push(row);const {type:eventType,at,...rest}=row;mutate('event.add',{type:eventType,data:rest,at});},
@@ -151,13 +160,13 @@
       this.getLeads().forEach(l=>{const k=localDay(l.submittedAt);if(k)leadsBy[k]=(leadsBy[k]||0)+1;});
       for(let i=days*2-1;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()-i),k=localDay(d),r=realBy[k]||{views:0,searches:0,saves:0,people:new Set()};out.push({date:k,visitors:r.people.size,views:r.views,searches:r.searches,saves:r.saves,leads:leadsBy[k]||0});}
       return out;},
-    exportAll(){const tables=DataPorts.db.tables();return {trestle_properties:DataPorts.catalog().map(h=>({listingKey:h.listingKey,reference:h.reference,name:h.name,city:h.city,price:h.price,beds:h.beds,baths:h.baths,sqft:h.sqft,status:h.status,address:h.address})),assumable_data:tables.assumable_data,custom_categories:tables.custom_categories,custom_fields:tables.custom_fields,custom_values:tables.custom_values,listings:[...listings,...soldListings].map(h=>({id:h.id,listingKey:h.listingKey,name:h.name,city:h.city,price:h.price,status:h.status,assumable:h.assumable,assumableRate:h.assumableRate,loanBalance:h.loanBalance,downPayment:h.downPayment,rentalRestrictions:h.rentalRestrictions,loanTermMonths:h.loanTermMonths,loanType:h.loanType})),users:this.getUsers(),leads:this.getLeads(),savedSearches:this.getSavedSearches(),alerts:this.getAlerts(),favorites:this.getFavorites(),events:this.getEvents()};},
+    exportAll(){const tables=DataPorts.db.tables();return {trestle_properties:DataPorts.catalog().map(h=>({listingKey:h.listingKey,reference:h.reference,name:h.name,city:h.city,price:h.price,beds:h.beds,baths:h.baths,sqft:h.sqft,status:h.status,address:h.address})),assumable_data:tables.assumable_data,custom_categories:tables.custom_categories,custom_fields:tables.custom_fields,custom_values:tables.custom_values,listings:[...listings,...soldListings].map(h=>({id:h.id,listingKey:h.listingKey,name:h.name,city:h.city,price:h.price,status:h.status,assumable:h.assumable,assumableRate:h.assumableRate,loanBalance:h.loanBalance,downPayment:h.downPayment,rentalRestrictions:h.rentalRestrictions,loanTermMonths:h.loanTermMonths,loanType:h.loanType})),users:this.getUsers(),leads:this.getLeads(),tasks:this.getTasks(),savedSearches:this.getSavedSearches(),alerts:this.getAlerts(),favorites:this.getFavorites(),events:this.getEvents()};},
     resetDemoData(){if(remote.on)fetch('/api/reset',{method:'POST',credentials:'include'}).then(()=>location.reload());}
   });
   DataPorts.ready.then(connected=>{
     if(!connected||!DataPorts.remoteState)return;
     const s=DataPorts.remoteState;
-    remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];remote.session=s.user||null;
+    remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];remote.tasks=s.tasks||[];remote.session=s.user||null;
     rebuild();
   });
 })();

@@ -30,7 +30,11 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS alerts (
     id TEXT PRIMARY KEY, user_id INTEGER, client_id TEXT, payload TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, payload TEXT, created_at TEXT NOT NULL)`
+    id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, payload TEXT, created_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY, task TEXT NOT NULL, owner TEXT, priority TEXT NOT NULL DEFAULT 'Medium',
+    frequency TEXT NOT NULL DEFAULT 'One-time', status TEXT NOT NULL DEFAULT 'Not started', due_date TEXT,
+    category TEXT, client TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`
 ];
 
 const ASSUMABLE = [
@@ -77,6 +81,15 @@ const LEADS = [
   ['L-1004','Dana Whitfield','dana.w@example.com','','info','search','The Desert Horizon','What is the equity gap on this one?','2026-11-04T22:15:00Z'],
   ['L-1005','Tom Becker','tbecker@example.com','(702) 555-0128','buy','community-detail','—','Relocating from Denver, Boulder City only.','2026-11-02T17:30:00Z'],
   ['L-1006','Luis Ortega','l.ortega@example.com','(702) 555-0193','tour','map','The Mesa Collection','FHA assumption — what credit score is needed?','2026-10-30T15:58:00Z']
+];
+const TASK_PRIORITIES = ['High', 'Medium', 'Low'];
+const TASK_FREQUENCIES = ['One-time', 'Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'];
+const TASK_STATUSES = ['Not started', 'In progress', 'Waiting', 'Done'];
+const TASKS = [
+  ['T-1001','Call Priya about Saturday tour','Janardhan Vangala','High','One-time','Not started','2026-11-28','Follow-up','Priya Natarajan'],
+  ['T-1002','Request VA assumption package from servicer','Janardhan Vangala','High','One-time','In progress','2026-12-02','Transaction','Marcus Reed'],
+  ['T-1003','Send market update email','Janardhan Vangala','Medium','Monthly','Not started','2026-12-01','Marketing',''],
+  ['T-1004','Check new assumable listings in the feed','Janardhan Vangala','Medium','Weekly','Not started','2026-11-30','Listings','']
 ];
 
 function json(data, status = 200, cookies = []) {
@@ -127,6 +140,8 @@ async function ensure(env) {
     const hash = row[3] ? await hashPassword(row[3]) : null;
     stmts.push(env.DB.prepare('INSERT INTO users (id, name, email, password_hash, role, phone, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(row[0], row[1], row[2], hash, row[4], row[5], row[6]));
   }
+  const seeded = new Date().toISOString();
+  for (const row of TASKS) stmts.push(env.DB.prepare('INSERT INTO tasks (id, task, owner, priority, frequency, status, due_date, category, client, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(...row, seeded, seeded));
   for (const row of LEADS) stmts.push(env.DB.prepare("INSERT INTO leads (id, name, email, phone, intent, source, home, message, status, submitted_at, sample) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, 1)").bind(...row));
   if (stmts.length) await env.DB.batch(stmts);
 }
@@ -156,6 +171,8 @@ async function readState(env, request) {
       : env.DB.prepare('SELECT * FROM alerts WHERE client_id = ? AND user_id IS NULL ORDER BY created_at DESC').bind(client).all(),
     env.DB.prepare('SELECT type, payload, created_at FROM events ORDER BY id DESC LIMIT 3000').all()
   ]);
+  const isAdmin = !!user && user.role === 'admin';
+  const tasks = isAdmin ? await env.DB.prepare('SELECT * FROM tasks ORDER BY due_date IS NULL, due_date, created_at').all() : { results: [] };
   const num = v => v == null ? null : Number(v);
   return {
     mode: 'database',
@@ -169,7 +186,26 @@ async function readState(env, request) {
     favorites: favorites.results.map(r => r.home_id),
     savedSearches: searches.results.map(r => ({ ...JSON.parse(r.payload), id: r.id, createdAt: r.created_at })),
     alerts: alerts.results.map(r => ({ ...JSON.parse(r.payload), id: r.id, active: !!r.active, createdAt: r.created_at })),
-    events: events.results.map(r => ({ type: r.type, ...(r.payload ? JSON.parse(r.payload) : {}), at: r.created_at })).reverse()
+    events: events.results.map(r => ({ type: r.type, ...(r.payload ? JSON.parse(r.payload) : {}), at: r.created_at })).reverse(),
+    tasks: tasks.results.map(taskOut)
+  };
+}
+function taskOut(r) {
+  return { id: r.id, task: r.task, owner: r.owner || '', priority: r.priority, frequency: r.frequency, status: r.status, dueDate: r.due_date || '', category: r.category || '', client: r.client || '', createdAt: r.created_at, updatedAt: r.updated_at };
+}
+function cleanTask(input) {
+  const text = v => String(v == null ? '' : v).trim().slice(0, 500);
+  const pick = (v, list, fallback) => list.includes(v) ? v : fallback;
+  const due = text(input.dueDate);
+  return {
+    task: text(input.task),
+    owner: text(input.owner),
+    priority: pick(input.priority, TASK_PRIORITIES, 'Medium'),
+    frequency: pick(input.frequency, TASK_FREQUENCIES, 'One-time'),
+    status: pick(input.status, TASK_STATUSES, 'Not started'),
+    dueDate: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : '',
+    category: text(input.category),
+    client: text(input.client)
   };
 }
 function owner(user, client) {
@@ -298,6 +334,21 @@ async function mutate(env, request, body) {
     await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(Number(payload.id)).run();
     return json({ ok: true });
   }
+  if (action === 'task.save') {
+    if (!admin) return json({ ok: false, error: 'Admins only.' }, 403);
+    const t = cleanTask(payload);
+    if (!t.task) return json({ ok: false, error: 'A task needs a description.' }, 400);
+    const now = new Date().toISOString();
+    const id = payload.id ? String(payload.id) : 'T-' + crypto.randomUUID();
+    await env.DB.prepare('INSERT INTO tasks (id, task, owner, priority, frequency, status, due_date, category, client, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET task = excluded.task, owner = excluded.owner, priority = excluded.priority, frequency = excluded.frequency, status = excluded.status, due_date = excluded.due_date, category = excluded.category, client = excluded.client, updated_at = excluded.updated_at').bind(id, t.task, t.owner, t.priority, t.frequency, t.status, t.dueDate || null, t.category, t.client, now, now).run();
+    const row = await env.DB.prepare('SELECT * FROM tasks WHERE id = ?').bind(id).first();
+    return json({ ok: true, task: taskOut(row) });
+  }
+  if (action === 'task.delete') {
+    if (!admin) return json({ ok: false, error: 'Admins only.' }, 403);
+    await env.DB.prepare('DELETE FROM tasks WHERE id = ?').bind(String(payload.id)).run();
+    return json({ ok: true });
+  }
   if (action === 'event.add') {
     await env.DB.prepare('INSERT INTO events (type, payload, created_at) VALUES (?, ?, ?)').bind(payload.type || 'view', JSON.stringify(payload.data || {}), payload.at || new Date().toISOString()).run();
     return json({ ok: true });
@@ -307,7 +358,7 @@ async function mutate(env, request, body) {
 async function resetDatabase(env, request) {
   const user = await currentUser(env, request);
   if (!user || user.role !== 'admin') return json({ ok: false, error: 'Admins only.' }, 403);
-  await env.DB.batch(['sessions','favorites','saved_searches','alerts','events','leads','custom_values','custom_fields','custom_categories','assumable_data','users'].map(table => env.DB.prepare('DELETE FROM ' + table)));
+  await env.DB.batch(['sessions','favorites','saved_searches','alerts','events','leads','tasks','custom_values','custom_fields','custom_categories','assumable_data','users'].map(table => env.DB.prepare('DELETE FROM ' + table)));
   await ensure(env);
   return json({ ok: true });
 }
