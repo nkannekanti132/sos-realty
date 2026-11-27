@@ -916,8 +916,8 @@ em.up{color:#1f7a52}em.down{color:#c03636}
 .adm-pipeline button.late b{color:#c03636}
 .tk-table .tk-name{min-width:240px;max-width:360px}
 .tk-table tr.tk-done td{color:#8a919d}.tk-table tr.tk-done .tk-name b{text-decoration:line-through;font-weight:600}
-.tk-pri{display:inline-block;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
-.tk-pri.pri-high{background:#fdecec;color:#a12828}.tk-pri.pri-medium{background:#fff4dc;color:#8a5a00}.tk-pri.pri-low{background:#eef1f6;color:#4b5563}
+.tk-pri{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 6px;box-sizing:border-box;border-radius:999px;font-size:13px;font-weight:700}
+.tk-pri.pri-1{background:#fdecec;color:#a12828}.tk-pri.pri-2{background:#fff0e3;color:#a3520f}.tk-pri.pri-3{background:#fff4dc;color:#8a5a00}.tk-pri.pri-4{background:#e6eefb;color:#264f8a}.tk-pri.pri-5{background:#eef1f6;color:#4b5563}
 .tk-st-not-started{background:#eef1f6!important;color:#3d4654!important}.tk-st-in-progress{background:#e6eefb!important;color:#264f8a!important}.tk-st-waiting{background:#efe8fb!important;color:#5a3a92!important}.tk-st-done{background:#e5f3ec!important;color:#1f7a52!important}
 .tk-due{display:grid;gap:1px;font-weight:600;white-space:nowrap}.tk-due small{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .tk-due.late{color:#c03636}.tk-due.today{color:#8a5a00}

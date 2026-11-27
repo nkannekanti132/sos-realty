@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
   task TEXT NOT NULL,
   owner TEXT,
-  priority TEXT NOT NULL DEFAULT 'Medium',
+  priority TEXT NOT NULL DEFAULT '3',
   frequency TEXT NOT NULL DEFAULT 'One-time',
   status TEXT NOT NULL DEFAULT 'Not started',
   due_date TEXT,

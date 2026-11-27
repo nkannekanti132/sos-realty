@@ -94,10 +94,12 @@
   const homeById=id=>listings.find(h=>h.id===Number(id))||soldListings.find(h=>h.id===Number(id));
   const users=()=>remote.users||[];
   const publicUser=u=>u?(({password,...rest})=>rest)(u):null;
-  const TASK_PRIORITIES=['High','Medium','Low'];
-  const TASK_FREQUENCIES=['One-time','Daily','Weekly','Monthly','Quarterly','Yearly'];
+  /* Keep these lists in step with worker.js. Priority 1 is the most urgent. */
+  const TASK_PRIORITIES=['1','2','3','4','5'];
+  const TASK_FREQUENCIES=['One-time','Daily','Weekly','Semi-monthly','Monthly','Quarterly','Yearly'];
   const TASK_STATUSES=['Not started','In progress','Waiting','Done'];
-  const TASK_CATEGORIES=['Follow-up','Listings','Transaction','Marketing','Showing','Paperwork','Admin'];
+  const TASK_CATEGORIES=['Personal Tasks','Loans','Homes','Both Home and Loan','Personal Finances','Other'];
+  const TASK_OWNERS=['Janardhan Vangala','Neethe Vangala'];
   const remote={on:false,users:null,leads:null,favorites:null,searches:null,alerts:null,events:null,tasks:[],session:null};
   const mutate=(action,payload)=>fetch('/api/mutate',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({action,payload})}).then(async r=>{const data=await r.json().catch(()=>({ok:false,error:'The database did not answer.'}));return (!r.ok||data.ok===false)?{ok:false,error:data.error||'The database rejected that edit.'}:data;}).catch(()=>offline);
   async function pull(){const ok=await DataPorts.connect();if(!ok||!DataPorts.remoteState)return offline;const s=DataPorts.remoteState;remote.on=true;remote.users=s.users;remote.leads=s.leads;remote.favorites=s.favorites||[];remote.searches=s.savedSearches||[];remote.alerts=s.alerts||[];remote.events=s.events||[];remote.tasks=s.tasks||[];if(s.user)remote.session=s.user;rebuild();return {ok:true};}
@@ -146,7 +148,7 @@
     async resetListing(id){const h=homeById(id);if(!h)return {ok:false,error:'That listing is not in the admin list.'};if(!remote.on)return offline;const res=await DataPorts.db.assumable.reset(h.listingKey);if(!res||res.ok===false){await pull();return res||offline;}rebuild();return {ok:true};},
     isEdited(id){const h=homeById(id);return h?DataPorts.db.assumable.isEdited(h.listingKey):false;},
     getLeads(){return remote.on?remote.leads:[];},
-    TASK_PRIORITIES,TASK_FREQUENCIES,TASK_STATUSES,TASK_CATEGORIES,
+    TASK_PRIORITIES,TASK_FREQUENCIES,TASK_STATUSES,TASK_CATEGORIES,TASK_OWNERS,
     /* Tasks are admin-only. The Worker sends them only to an admin session and rejects edits from anyone else. */
     getTasks(){return remote.on&&remote.session?.role==='admin'?remote.tasks:[];},
     async saveTask(task){if(!remote.on)return offline;const res=await mutate('task.save',task);if(!res||res.ok===false){await pull();return res||offline;}const i=remote.tasks.findIndex(t=>t.id===res.task.id);if(i>=0)remote.tasks[i]=res.task;else remote.tasks.push(res.task);return res;},

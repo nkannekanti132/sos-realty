@@ -32,7 +32,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, payload TEXT, created_at TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY, task TEXT NOT NULL, owner TEXT, priority TEXT NOT NULL DEFAULT 'Medium',
+    id TEXT PRIMARY KEY, task TEXT NOT NULL, owner TEXT, priority TEXT NOT NULL DEFAULT '3',
     frequency TEXT NOT NULL DEFAULT 'One-time', status TEXT NOT NULL DEFAULT 'Not started', due_date TEXT,
     category TEXT, client TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`
 ];
@@ -82,14 +82,16 @@ const LEADS = [
   ['L-1005','Tom Becker','tbecker@example.com','(702) 555-0128','buy','community-detail','—','Relocating from Denver, Boulder City only.','2026-11-02T17:30:00Z'],
   ['L-1006','Luis Ortega','l.ortega@example.com','(702) 555-0193','tour','map','The Mesa Collection','FHA assumption — what credit score is needed?','2026-10-30T15:58:00Z']
 ];
-const TASK_PRIORITIES = ['High', 'Medium', 'Low'];
-const TASK_FREQUENCIES = ['One-time', 'Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'];
+// Priority 1 is the most urgent, 5 the least.
+const TASK_PRIORITIES = ['1', '2', '3', '4', '5'];
+const TASK_FREQUENCIES = ['One-time', 'Daily', 'Weekly', 'Semi-monthly', 'Monthly', 'Quarterly', 'Yearly'];
 const TASK_STATUSES = ['Not started', 'In progress', 'Waiting', 'Done'];
+const TASK_CATEGORIES = ['Personal Tasks', 'Loans', 'Homes', 'Both Home and Loan', 'Personal Finances', 'Other'];
 const TASKS = [
-  ['T-1001','Call Priya about Saturday tour','Janardhan Vangala','High','One-time','Not started','2026-11-28','Follow-up','Priya Natarajan'],
-  ['T-1002','Request VA assumption package from servicer','Janardhan Vangala','High','One-time','In progress','2026-12-02','Transaction','Marcus Reed'],
-  ['T-1003','Send market update email','Janardhan Vangala','Medium','Monthly','Not started','2026-12-01','Marketing',''],
-  ['T-1004','Check new assumable listings in the feed','Janardhan Vangala','Medium','Weekly','Not started','2026-11-30','Listings','']
+  ['T-1001','Call Priya about Saturday tour','Janardhan Vangala','1','One-time','Not started','2026-11-28','Homes','Priya Natarajan'],
+  ['T-1002','Request VA assumption package from servicer','Janardhan Vangala','1','One-time','In progress','2026-12-02','Both Home and Loan','Marcus Reed'],
+  ['T-1003','Review monthly budget','Neethe Vangala','3','Monthly','Not started','2026-12-01','Personal Finances',''],
+  ['T-1004','Check new assumable loans in the feed','Janardhan Vangala','2','Weekly','Not started','2026-11-30','Loans','']
 ];
 
 function json(data, status = 200, cookies = []) {
@@ -200,11 +202,11 @@ function cleanTask(input) {
   return {
     task: text(input.task),
     owner: text(input.owner),
-    priority: pick(input.priority, TASK_PRIORITIES, 'Medium'),
+    priority: pick(String(input.priority == null ? '' : input.priority), TASK_PRIORITIES, '3'),
     frequency: pick(input.frequency, TASK_FREQUENCIES, 'One-time'),
     status: pick(input.status, TASK_STATUSES, 'Not started'),
     dueDate: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : '',
-    category: text(input.category),
+    category: text(input.category) ? pick(text(input.category), TASK_CATEGORIES, 'Other') : '',
     client: text(input.client)
   };
 }
